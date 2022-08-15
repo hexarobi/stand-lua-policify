@@ -189,7 +189,7 @@ local function save_paint(vehicle)
         Vehicle = Vehicle,
         Extras = ColorExtras
     }
-    saveData.Livery.style = VEHICLE.GET_VEHICLE_LIVERY(vehicle)
+    saveData.Livery.style = VEHICLE.GET_VEHICLE_MOD(vehicle, 48)
 end
 
 local function restore_paint(vehicle)
@@ -213,7 +213,7 @@ local function restore_paint(vehicle)
     end
     VEHICLE.SET_VEHICLE_ENVEFF_SCALE(vehicle, saveData["Colors"]["Paint Fade"] or 0)
 
-    VEHICLE.SET_VEHICLE_LIVERY(vehicle, saveData.Livery.style or -1)
+    VEHICLE.SET_VEHICLE_MOD(vehicle, 48, saveData.Livery.style or -1)
 end
 
 local function save_horn(vehicle)
