@@ -1,4 +1,4 @@
--- Policify 1.2
+-- Policify 1.3
 -- by Hexarobi
 -- Enable Policify option to modify current vehicle, disable option to remove modifications
 -- Modifies horn, paint, neon, and headlights. Flashes headlights and neon between red and blue.
@@ -92,10 +92,12 @@ local saveData = {
 
 local function save_headlights(vehicle)
     saveData.Headlights_Color = VEHICLE._GET_VEHICLE_XENON_LIGHTS_COLOR(vehicle)
+    saveData.Headlights_Type = VEHICLE.IS_TOGGLE_MOD_ON(vehicle, 22)
 end
 
 local function restore_headlights(vehicle)
     VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(vehicle, saveData.Headlights_Color)
+    VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, saveData.Headlights_Type or false)
 end
 
 local function save_neon(vehicle)
@@ -238,6 +240,9 @@ local function restore_plate(vehicle)
 end
 
 local function policify_vehicle(vehicle)
+    -- Enable Xenon Headlights
+    VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, 22, true)
+
     -- Enable Neon
     VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 0, true)
     VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 1, true)
