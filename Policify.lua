@@ -1,4 +1,4 @@
--- Policify 1.4
+-- Policify 1.4.1
 -- by Hexarobi
 -- Enable Policify option to modify current vehicle, disable option to remove modifications
 -- Modifies horn, paint, neon, and headlights. Flashes headlights and neon between red and blue.
@@ -263,8 +263,10 @@ local function policify_vehicle(vehicle)
         VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 3, true)
     end
 
-    -- Police Horn
-    VEHICLE.SET_VEHICLE_MOD(vehicle, 14, 1)
+    if overide_horn then
+        -- Police Horn
+        VEHICLE.SET_VEHICLE_MOD(vehicle, 14, 1)
+    end
 
     if override_paint then
         -- Paint matte black
@@ -277,10 +279,12 @@ local function policify_vehicle(vehicle)
         VEHICLE.SET_VEHICLE_MOD(vehicle, 48, -1)
     end
 
-    -- Set Exempt plate
-    ENTITY.SET_ENTITY_AS_MISSION_ENTITY(vehicle, true, true)
-    VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT_INDEX(vehicle, 4)
-    VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT(vehicle, "FIB")
+    if override_plate then
+        -- Set Exempt plate
+        ENTITY.SET_ENTITY_AS_MISSION_ENTITY(vehicle, true, true)
+        VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT_INDEX(vehicle, 4)
+        VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT(vehicle, "FIB")
+    end
 
 end
 
