@@ -1,4 +1,4 @@
--- Policify 1.3
+-- Policify 1.4
 -- by Hexarobi
 -- Enable Policify option to modify current vehicle, disable option to remove modifications
 -- Modifies horn, paint, neon, and headlights. Flashes headlights and neon between red and blue.
@@ -239,64 +239,95 @@ local function restore_plate(vehicle)
     VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT_INDEX(vehicle, saveData["License Plate"].Type)
 end
 
-local function policify_vehicle(vehicle)
-    -- Enable Xenon Headlights
-    VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, 22, true)
+local policified_vehicle
+local policify_tick_counter
+local flash_delay = 50
+local override_paint = true
+local override_headlights = true
+local override_neon = true
+local override_plate = true
+local overide_horn = true
 
-    -- Enable Neon
-    VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 0, true)
-    VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 1, true)
-    VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 2, true)
-    VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 3, true)
+local function policify_vehicle(vehicle)
+
+    if override_headlights then
+        -- Enable Xenon Headlights
+        VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, 22, true)
+    end
+
+    if override_neon then
+        -- Enable Neon
+        VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 0, true)
+        VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 1, true)
+        VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 2, true)
+        VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 3, true)
+    end
 
     -- Police Horn
     VEHICLE.SET_VEHICLE_MOD(vehicle, 14, 1)
 
-    -- Paint matte black
-    VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, 0, 0, 0)
-    VEHICLE.SET_VEHICLE_MOD_COLOR_1(vehicle, 3, 0, 0)
-    VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, 0, 0, 0)
-    VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, 3, 0, 0)
+    if override_paint then
+        -- Paint matte black
+        VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, 0, 0, 0)
+        VEHICLE.SET_VEHICLE_MOD_COLOR_1(vehicle, 3, 0, 0)
+        VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, 0, 0, 0)
+        VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, 3, 0, 0)
 
-    -- Clear livery
-    VEHICLE.SET_VEHICLE_MOD(vehicle, 48, -1)
+        -- Clear livery
+        VEHICLE.SET_VEHICLE_MOD(vehicle, 48, -1)
+    end
 
     -- Set Exempt plate
     ENTITY.SET_ENTITY_AS_MISSION_ENTITY(vehicle, true, true)
     VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT_INDEX(vehicle, 4)
     VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT(vehicle, "FIB")
-end
 
-local policified_vehicle
-local policify_tick_counter
-local POLICIFY_CYCLE_TIME = 80
+end
 
 local policify_ticker = function()
     if policified_vehicle == nil then
         util.toast("Invalid vehicle for policify ticker")
     end
-    if policify_tick_counter % (POLICIFY_CYCLE_TIME / 2) == 0 then
-        if policify_tick_counter % POLICIFY_CYCLE_TIME == 0 then
-            VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(policified_vehicle, 8)
-            VEHICLE._SET_VEHICLE_NEON_LIGHTS_COLOUR(policified_vehicle, 0, 0, 255)
+    if policify_tick_counter % flash_delay == 0 then
+        if policify_tick_counter % (flash_delay * 2) == 0 then
+            if override_headlights then
+                VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(policified_vehicle, 8)
+            end
+            if override_neon then
+                VEHICLE._SET_VEHICLE_NEON_LIGHTS_COLOUR(policified_vehicle, 0, 0, 255)
+            end
         else
-            VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(policified_vehicle, 1)
-            VEHICLE._SET_VEHICLE_NEON_LIGHTS_COLOUR(policified_vehicle, 255, 0, 0)
+            if override_headlights then
+                VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(policified_vehicle, 1)
+            end
+            if override_neon then
+                VEHICLE._SET_VEHICLE_NEON_LIGHTS_COLOUR(policified_vehicle, 255, 0, 0)
+            end
         end
     end
     policify_tick_counter = policify_tick_counter + 1
 end
 
-menu.toggle(menu.my_root(), "Policify", {"policify"}, "", function(on)
+menu.toggle(menu.my_root(), "Policify Vehicle", {"policify"}, "Enable Policify options on current vehicle", function(on)
     if on then
         policified_vehicle = get_player_vehicle_in_control(players.user())
         if policified_vehicle then
 
-            save_headlights(policified_vehicle)
-            save_neon(policified_vehicle)
-            save_horn(policified_vehicle)
-            save_paint(policified_vehicle)
-            save_plate(policified_vehicle)
+            if override_headlights then
+                save_headlights(policified_vehicle)
+            end
+            if override_neon then
+                save_neon(policified_vehicle)
+            end
+            if overide_horn then
+                save_horn(policified_vehicle)
+            end
+            if override_paint then
+                save_paint(policified_vehicle)
+            end
+            if override_plate then
+                save_plate(policified_vehicle)
+            end
 
             policify_vehicle(policified_vehicle)
 
@@ -311,13 +342,104 @@ menu.toggle(menu.my_root(), "Policify", {"policify"}, "", function(on)
         end
     else
         policify_tick_counter = nil
-        restore_headlights(policified_vehicle)
-        restore_neon(policified_vehicle)
-        restore_horn(policified_vehicle)
-        restore_paint(policified_vehicle)
-        restore_plate(policified_vehicle)
+        if override_headlights then
+            restore_headlights(policified_vehicle)
+        end
+        if override_neon then
+            restore_neon(policified_vehicle)
+        end
+        if overide_horn then
+            restore_horn(policified_vehicle)
+        end
+        if override_paint then
+            restore_paint(policified_vehicle)
+        end
+        if override_plate then
+            restore_plate(policified_vehicle)
+        end
     end
 end)
+
+menu.divider(menu.my_root(), "Options")
+
+menu.slider(menu.my_root(), "Flash Delay", {"policifydelay"}, "Setting a too low value may not network the colors to other players!", 20, 150, 50, 10, function (value)
+    flash_delay = value
+end)
+
+menu.toggle(menu.my_root(), "Enable Paint", {}, "If enabled, will override vehicle paint to matte black", function(toggle)
+    if toggle then
+        override_paint = true
+        if policify_tick_counter ~= nil then
+            save_paint(policified_vehicle)
+            policify_vehicle(policified_vehicle)
+        end
+    else
+        override_paint = false
+        if policify_tick_counter ~= nil then
+            restore_paint(policified_vehicle)
+        end
+    end
+end, true)
+
+menu.toggle(menu.my_root(), "Enable Headlights", {}, "If enabled, will override vehicle headlights to flash blue and red", function(toggle)
+    if toggle then
+        override_headlights = true
+        if policify_tick_counter ~= nil then
+            save_headlights(policified_vehicle)
+            policify_vehicle(policified_vehicle)
+        end
+    else
+        override_headlights = false
+        if policify_tick_counter ~= nil then
+            restore_headlights(policified_vehicle)
+        end
+    end
+end, true)
+
+menu.toggle(menu.my_root(), "Enable Neon", {}, "If enabled, will override vehicle neon to flash red and blue", function(toggle)
+    if toggle then
+        override_neon = true
+        if policify_tick_counter ~= nil then
+            save_neon(policified_vehicle)
+            policify_vehicle(policified_vehicle)
+        end
+    else
+        override_neon = false
+        if policify_tick_counter ~= nil then
+            restore_neon(policified_vehicle)
+        end
+    end
+end, true)
+
+menu.toggle(menu.my_root(), "Enable Horn", {}, "If enabled, will override vehicle horn to police horn", function(toggle)
+    if toggle then
+        overide_horn = true
+        if policify_tick_counter ~= nil then
+            save_horn(policified_vehicle)
+            policify_vehicle(policified_vehicle)
+        end
+    else
+        overide_horn = false
+        if policify_tick_counter ~= nil then
+            restore_horn(policified_vehicle)
+        end
+    end
+end, true)
+
+menu.toggle(menu.my_root(), "Enable Plate", {}, "If enabled, will override vehicle plate with FIB Exempt plate", function(toggle)
+    if toggle then
+        override_plate = true
+        if policify_tick_counter ~= nil then
+            save_plate(policified_vehicle)
+            policify_vehicle(policified_vehicle)
+        end
+    else
+        override_plate = false
+        if policify_tick_counter ~= nil then
+            restore_plate(policified_vehicle)
+        end
+    end
+end, true)
 
 util.create_tick_handler(function()
     return true
