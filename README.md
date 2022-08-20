@@ -14,3 +14,7 @@ Mods include:
 Triggers to control
 * Continuous siren audio
 * Quick warning blip sound
+
+## Installation
+
+Copy the `Policify.lua` file to your `Stand/Lua Scripts` directory
