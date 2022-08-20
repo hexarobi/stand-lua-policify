@@ -529,13 +529,15 @@ menu.toggle(menu.my_root(), "Siren Sounds", {"sirens"}, "Enables siren sounds to
     end
 end)
 
-menu.divider(menu.my_root(), "Options")
+-- menu.divider(menu.my_root(), "Options")
 
-menu.slider(menu.my_root(), "Flash Delay", {"policifydelay"}, "Setting a too low value may not network the colors to other players!", 20, 150, 50, 10, function (value)
+local options_menu = menu.list(menu.my_root(), "Options")
+
+menu.slider(options_menu, "Flash Delay", {"policifydelay"}, "Setting a too low value may not network the colors to other players!", 20, 150, 50, 10, function (value)
     flash_delay = value
 end)
 
-menu.toggle(menu.my_root(), "Enable Paint", {}, "If enabled, will override vehicle paint to matte black", function(toggle)
+menu.toggle(options_menu, "Override Paint", {}, "If enabled, will override vehicle paint to matte black", function(toggle)
     if toggle then
         override_paint = true
         if policify_tick_counter ~= nil then
@@ -550,7 +552,7 @@ menu.toggle(menu.my_root(), "Enable Paint", {}, "If enabled, will override vehic
     end
 end, true)
 
-menu.toggle(menu.my_root(), "Enable Headlights", {}, "If enabled, will override vehicle headlights to flash blue and red", function(toggle)
+menu.toggle(options_menu, "Override Headlights", {}, "If enabled, will override vehicle headlights to flash blue and red", function(toggle)
     if toggle then
         override_headlights = true
         if policify_tick_counter ~= nil then
@@ -565,7 +567,7 @@ menu.toggle(menu.my_root(), "Enable Headlights", {}, "If enabled, will override 
     end
 end, true)
 
-menu.toggle(menu.my_root(), "Enable Neon", {}, "If enabled, will override vehicle neon to flash red and blue", function(toggle)
+menu.toggle(options_menu, "Override Neon", {}, "If enabled, will override vehicle neon to flash red and blue", function(toggle)
     if toggle then
         override_neon = true
         if policify_tick_counter ~= nil then
@@ -580,7 +582,7 @@ menu.toggle(menu.my_root(), "Enable Neon", {}, "If enabled, will override vehicl
     end
 end, true)
 
-menu.toggle(menu.my_root(), "Enable Horn", {}, "If enabled, will override vehicle horn to police horn", function(toggle)
+menu.toggle(options_menu, "Override Horn", {}, "If enabled, will override vehicle horn to police horn", function(toggle)
     if toggle then
         overide_horn = true
         if policify_tick_counter ~= nil then
@@ -595,22 +597,7 @@ menu.toggle(menu.my_root(), "Enable Horn", {}, "If enabled, will override vehicl
     end
 end, true)
 
-menu.toggle(menu.my_root(), "Enable Siren", {}, "If enabled, will add siren", function(toggle)
-    if toggle then
-        override_siren = true
-        if policify_tick_counter ~= nil then
-            save_siren(policified_vehicle)
-            policify_vehicle(policified_vehicle)
-        end
-    else
-        override_siren = false
-        if policify_tick_counter ~= nil then
-            restore_siren(policified_vehicle)
-        end
-    end
-end, true)
-
-menu.toggle(menu.my_root(), "Enable Plate", {}, "If enabled, will override vehicle plate with FIB Exempt plate", function(toggle)
+menu.toggle(options_menu, "Override Plate", {}, "If enabled, will override vehicle plate with FIB Exempt plate", function(toggle)
     if toggle then
         override_plate = true
         if policify_tick_counter ~= nil then
@@ -621,6 +608,21 @@ menu.toggle(menu.my_root(), "Enable Plate", {}, "If enabled, will override vehic
         override_plate = false
         if policify_tick_counter ~= nil then
             restore_plate(policified_vehicle)
+        end
+    end
+end, true)
+
+menu.toggle(options_menu, "Enable Siren", {}, "If enabled, will spawn an invisible police bike to play its siren", function(toggle)
+    if toggle then
+        override_siren = true
+        if policify_tick_counter ~= nil then
+            save_siren(policified_vehicle)
+            policify_vehicle(policified_vehicle)
+        end
+    else
+        override_siren = false
+        if policify_tick_counter ~= nil then
+            restore_siren(policified_vehicle)
         end
     end
 end, true)
