@@ -1,4 +1,4 @@
--- Policify 1.5
+-- Policify 1.6
 -- by Hexarobi
 -- Enable Policify option to modify current vehicle, disable option to remove modifications
 -- Modifies horn, paint, neon, and headlights. Flashes headlights and neon between red and blue.
@@ -95,6 +95,10 @@ local function save_headlights(vehicle)
     saveData.Headlights_Type = VEHICLE.IS_TOGGLE_MOD_ON(vehicle, 22)
 end
 
+local function set_headlights(vehicle)
+    VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, 22, true)
+end
+
 local function restore_headlights(vehicle)
     VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(vehicle, saveData.Headlights_Color)
     VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, saveData.Headlights_Type or false)
@@ -118,6 +122,13 @@ local function save_neon(vehicle)
         Front = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 2),
         Back = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 3),
     }
+end
+
+local function set_neon(vehicle)
+    VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 0, true)
+    VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 1, true)
+    VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 2, true)
+    VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 3, true)
 end
 
 local function restore_neon(vehicle)
@@ -194,6 +205,17 @@ local function save_paint(vehicle)
     saveData.Livery.style = VEHICLE.GET_VEHICLE_MOD(vehicle, 48)
 end
 
+local function set_paint(vehicle)
+    -- Paint matte black
+    VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, 0, 0, 0)
+    VEHICLE.SET_VEHICLE_MOD_COLOR_1(vehicle, 3, 0, 0)
+    VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, 0, 0, 0)
+    VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, 3, 0, 0)
+
+    -- Clear livery
+    VEHICLE.SET_VEHICLE_MOD(vehicle, 48, -1)
+end
+
 local function restore_paint(vehicle)
     VEHICLE.SET_VEHICLE_MOD_KIT(vehicle, 0)
     VEHICLE.SET_VEHICLE_COLOUR_COMBINATION(vehicle, saveData.Colors["Color Combo"] or -1)
@@ -223,13 +245,19 @@ local function save_horn(vehicle)
     VEHICLE.SET_VEHICLE_SIREN(vehicle, true)
 end
 
+local function set_horn(vehicle)
+    -- Police Horn
+    VEHICLE.SET_VEHICLE_MOD(vehicle, 14, 1)
+end
+
 local function restore_horn(vehicle)
     VEHICLE.SET_VEHICLE_MOD(vehicle, 14, saveData.Horn)
     VEHICLE.SET_VEHICLE_SIREN(vehicle, false)
 end
 
 local attachments = {
-    siren = nil
+    siren = nil,
+    additional_lights = nil,
 }
 
 local function load_hash(hash)
@@ -239,48 +267,134 @@ local function load_hash(hash)
     end
 end
 
-local function attach_model_to_vehicle(vehicle, vehicle_name, pos, rot)
-    local hash = util.joaat(vehicle_name)
-    if not STREAMING.IS_MODEL_VALID(hash) then
-        util.toast("Failing to spawn vehicle due to invalid model.")
+local function attach(args)
+    local hash = util.joaat(args.model)
+    if not STREAMING.IS_MODEL_VALID(hash) or (args.type ~= "vehicle" and STREAMING.IS_MODEL_A_VEHICLE(hash)) then
+        util.toast("Error attaching: Invalid model")
         return
     end
     load_hash(hash)
-    if pos == nil then
-        pos = { x=0, y=0, z=0 }
+    local offset = args.offset
+    if offset == nil then
+        offset = { x=0, y=0, z=0 }
     end
+    local rot = args.rot
     if rot == nil then
         rot = { x=0, y=0, z=0 }
     end
-    local heading = ENTITY.GET_ENTITY_HEADING(vehicle)
-    local handle = entities.create_vehicle(hash, pos, heading)
-    ENTITY.SET_ENTITY_INVINCIBLE(handle, true)
-    ENTITY.SET_ENTITY_NO_COLLISION_ENTITY(vehicle, handle)
+
+    ENTITY.FREEZE_ENTITY_POSITION(base, true)
+
+    local parent = args.parent or args.root
+
+    local handle
+    if args.type == "vehicle" then
+        local heading = ENTITY.GET_ENTITY_HEADING(args.root)
+        handle = entities.create_vehicle(hash, offset, heading)
+    else
+        local pos = ENTITY.GET_ENTITY_COORDS(args.root)
+        handle = OBJECT.CREATE_OBJECT(hash, pos.x, pos.y, pos.z, false, false, 0)
+        -- handle = entities.create_object(hash, ENTITY.GET_ENTITY_COORDS(args.root))
+    end
+    --STREAMING.SET_MODEL_AS_NO_LONGER_NEEDED(hash)
+    ENTITY.SET_ENTITY_INVINCIBLE(handle, false)
     ENTITY.SET_ENTITY_HAS_GRAVITY(handle, false)
-    ENTITY.ATTACH_ENTITY_TO_ENTITY(handle, vehicle, 0,
-            pos.x or 0, pos.y or 0, pos.z or 0,
+    ENTITY.ATTACH_ENTITY_TO_ENTITY(handle, parent, args.bone_index or 0,
+            offset.x or 0, offset.y or 0, offset.z or 0,
             rot.x or 0, rot.y or 0, rot.z or 0,
-            false, true, true, false, 2, true
+            false, true, false, false, 2, true
     )
+
+    for _, handle2 in ipairs(args.handles) do
+        ENTITY.SET_ENTITY_NO_COLLISION_ENTITY(handle, handle2)
+    end
+    ENTITY.SET_ENTITY_NO_COLLISION_ENTITY(args.root, handle)
+    table.insert(args.handles, handle)
+
+    if args.is_visible == false then
+        ENTITY.SET_ENTITY_ALPHA(handle, 0, false)
+        local network_handle = NETWORK.OBJ_TO_NET(handle)
+    end
+
+    --ENTITY.SET_ENTITY_AS_MISSION_ENTITY(handle)
+    --ENTITY._SET_ENTITY_CLEANUP_BY_ENGINE(handle, false)
+
+    ENTITY.FREEZE_ENTITY_POSITION(base, false)
+
     return handle
 end
 
+local function set_siren(vehicle)
+    if attachments.siren ~= nil then
+        util.toast("Error setting siren. Already set")
+        return
+    end
+    attachments.siren = {}
+    local handle = attach{root=vehicle, parent=vehicle, handles=attachments.siren, model="policeb", type="vehicle", is_visible=false}
+    AUDIO.SET_SIREN_WITH_NO_DRIVER(handle, true)
+    AUDIO._SET_SIREN_KEEP_ON(handle, true)
+    VEHICLE.SET_VEHICLE_HAS_MUTED_SIRENS(handle, false)
+    VEHICLE.SET_VEHICLE_SIREN(handle, true)
+end
 
-local function save_siren(vehicle)
-    if attachments.siren == nil then
-        local handle = attach_model_to_vehicle(vehicle, "policeb")
-        attachments.siren = handle
-        AUDIO.SET_SIREN_WITH_NO_DRIVER(handle, true)
-        AUDIO._SET_SIREN_KEEP_ON(handle, true)
-        VEHICLE.SET_VEHICLE_HAS_MUTED_SIRENS(handle, false)
-        VEHICLE.SET_VEHICLE_SIREN(handle, true)
-        ENTITY.SET_ENTITY_ALPHA(handle, 0, false)
+-- Good props for cop lights
+-- prop_air_lights_02a blue
+-- prop_air_lights_02b red
+-- h4_prop_battle_lights_floorblue
+-- h4_prop_battle_lights_floorred
+-- prop_wall_light_10a
+-- prop_wall_light_10b
+-- prop_wall_light_10c
+-- hei_prop_wall_light_10a_cr
+
+local function set_additional_lights(vehicle)
+    if attachments.additional_lights ~= nil then
+        util.toast("Error setting additional lights. Already set")
+        return
+    end
+
+    attachments.additional_lights = {}
+
+    local handles = attachments.additional_lights
+
+    -- attach{root=vehicle, parent=vehicle, handles=handles, model="hei_prop_wall_light_10a_cr", offset={x=0,y=0,z=1}, rot={x=180,y=0,z=180}}
+
+    ------ Add spinning radar code light
+    local radar_root_offset = {x=0.3,y=-0.3,z=3}
+    local radar_offset = {x=0,y=0,z=-0.55}
+    local light_offset = {x=0,y=0,z=-3}
+    local radar1 = attach{root=vehicle, handles=handles, model="apa_mp_apa_yacht_radar_01a", offset=radar_root_offset, is_visible=false}
+    local radar2 = attach{root=vehicle, handles=handles, parent=radar1, model="apa_mp_apa_yacht_radar_01a", offset=radar_offset, is_visible=false, bone_index=1}
+    local radar3 = attach{root=vehicle, handles=handles, parent=radar2, model="apa_mp_apa_yacht_radar_01a", offset=radar_offset, is_visible=false, bone_index=1}
+    local radar4 = attach{root=vehicle, handles=handles, parent=radar3, model="apa_mp_apa_yacht_radar_01a", offset=radar_offset, is_visible=false, bone_index=1}
+    local radar5 = attach{root=vehicle, handles=handles, parent=radar4, model="apa_mp_apa_yacht_radar_01a", offset=radar_offset, is_visible=false, bone_index=1}
+    attach{root=vehicle, handles=handles, parent=radar5, model="prop_wall_light_10a", offset=light_offset, rot={x=180,y=0,z=0}, bone_index=1}
+
+    radar_root_offset = {x=0-radar_root_offset.x, y=radar_root_offset.y, z=radar_root_offset.z}
+    light_offset = {x=0-light_offset.x, y=light_offset.y, z=light_offset.z}
+    local radar21 = attach{root=vehicle, handles=handles, model="apa_mp_apa_yacht_radar_01a", offset=radar_root_offset, is_visible=false}
+    local radar22 = attach{root=vehicle, handles=handles, parent=radar21, model="apa_mp_apa_yacht_radar_01a", offset=radar_offset, is_visible=false, bone_index=1}
+    local radar23 = attach{root=vehicle, handles=handles, parent=radar22, model="apa_mp_apa_yacht_radar_01a", offset=radar_offset, is_visible=false, bone_index=1}
+    local radar24 = attach{root=vehicle, handles=handles, parent=radar23, model="apa_mp_apa_yacht_radar_01a", offset=radar_offset, is_visible=false, bone_index=1}
+    local radar25 = attach{root=vehicle, handles=handles, parent=radar24, model="apa_mp_apa_yacht_radar_01a", offset=radar_offset, is_visible=false, bone_index=1}
+    attach{root=vehicle, handles=handles, parent=radar25, model="prop_wall_light_10b", offset=light_offset, rot={x=180,y=0,z=180}, bone_index=1}
+
+end
+
+local function restore_additional_lights(vehicle)
+    if attachments.additional_lights ~= nil then
+        for _, handle in pairs(attachments.additional_lights) do
+            entities.delete_by_handle(handle)
+        end
+        attachments.additional_lights = nil
     end
 end
 
 local function restore_siren(vehicle)
     if attachments.siren ~= nil then
-        entities.delete_by_handle(attachments.siren)
+        for _, handle in pairs(attachments.siren) do
+            entities.delete_by_handle(handle)
+        end
         attachments.siren = nil
     end
 end
@@ -292,34 +406,17 @@ local function save_plate(vehicle)
     }
 end
 
+local function set_plate(vehicle)
+    -- Set Exempt plate
+    ENTITY.SET_ENTITY_AS_MISSION_ENTITY(vehicle, true, true)
+    VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT_INDEX(vehicle, 4)
+    VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT(vehicle, "FIB")
+end
+
 local function restore_plate(vehicle)
     ENTITY.SET_ENTITY_AS_MISSION_ENTITY(vehicle, true, true)
     VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT(vehicle, saveData["License Plate"].Text)
     VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT_INDEX(vehicle, saveData["License Plate"].Type)
-end
-
-local function attach_to_vehicle(vehicle, model, pos, rot)
-    local hash = util.joaat(model)
-    if STREAMING.IS_MODEL_VALID(hash) and not STREAMING.IS_MODEL_A_VEHICLE(hash) then
-        STREAMING.REQUEST_MODEL(hash)
-        while not STREAMING.HAS_MODEL_LOADED(hash) do
-            util.yield()
-        end
-        if pos == nil then
-            pos = {x=0, y=0, z=0}
-        end
-        if rot == nil then
-            rot = {x=0, y=0, z=0}
-        end
-        local object = entities.create_object(hash, pos)
-        ENTITY.ATTACH_ENTITY_TO_ENTITY(object, vehicle, 0,
-                pos.x or 0, pos.y or 0, pos.z or 0,
-                rot.x or 0, rot.y or 0, rot.z or 0,
-                false, true, true, false, 2, true
-        )
-        STREAMING.SET_MODEL_AS_NO_LONGER_NEEDED(hash)
-        return object
-    end
 end
 
 local policified_vehicle
@@ -329,92 +426,43 @@ local override_paint = true
 local override_headlights = true
 local override_neon = true
 local override_plate = true
-local overide_horn = true
+local override_horn = true
 local override_siren = true
-
-local lights = {}
-
-local function attach_hidden_prop_to_vehicle(vehicle, model, pos, rot)
-    local handle = attach_to_vehicle(vehicle, model, pos, rot)
-    -- ENTITY.SET_ENTITY_ALPHA(handle, 0)
-    return handle
-end
-
--- prop_air_lights_02a blue
--- prop_air_lights_02b red
-
-local function add_police_light(vehicle, pos, rot)
-    --if pos.x == 0 then
-    --    -- Single Light
-    --    table.insert(lights, {
-    --        red=attach_hidden_prop_to_vehicle(vehicle,"h4_prop_battle_lights_floorred", pos, rot),
-    --        blue=attach_hidden_prop_to_vehicle(vehicle,"h4_prop_battle_lights_floorblue", pos, rot)
-    --    })
-    --else
-    --    -- Pair of Lights
-    table.insert(lights, {
-        red=attach_hidden_prop_to_vehicle(vehicle,"h4_prop_battle_lights_floorred", pos, rot),
-        -- blue=attach_hidden_prop_to_vehicle(vehicle,"h4_prop_battle_lights_floorblue", pos, rot)
-    })
-    --local reflected_pos = pos
-    --reflected_pos.x = 0 - pos.x
-    --table.insert(lights, {
-    --    red=attach_hidden_prop_to_vehicle(vehicle,"h4_prop_battle_lights_floorblue", reflected_pos, rot),
-    --    -- blue=attach_hidden_prop_to_vehicle(vehicle,"h4_prop_battle_lights_floorred", reflected_pos, rot)
-    --})
-    --end
-end
+local override_additional_lights = true
 
 local function policify_vehicle(vehicle)
     if override_headlights then
         save_headlights(vehicle)
-        -- Enable Xenon Headlights
-        VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, 22, true)
+        set_headlights(vehicle)
     end
 
     if override_neon then
         save_neon(vehicle)
-        -- Enable Neon
-        VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 0, true)
-        VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 1, true)
-        VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 2, true)
-        VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 3, true)
+        set_neon(vehicle)
     end
 
-    if overide_horn then
+    if override_horn then
         save_horn(vehicle)
-        -- Police Horn
-        VEHICLE.SET_VEHICLE_MOD(vehicle, 14, 1)
+        set_horn(vehicle)
     end
 
     if override_paint then
         save_paint(vehicle)
-        -- Paint matte black
-        VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, 0, 0, 0)
-        VEHICLE.SET_VEHICLE_MOD_COLOR_1(vehicle, 3, 0, 0)
-        VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, 0, 0, 0)
-        VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, 3, 0, 0)
-
-        -- Clear livery
-        VEHICLE.SET_VEHICLE_MOD(vehicle, 48, -1)
+        set_paint(vehicle)
     end
 
     if override_plate then
         save_plate(vehicle)
-        -- Set Exempt plate
-        ENTITY.SET_ENTITY_AS_MISSION_ENTITY(vehicle, true, true)
-        VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT_INDEX(vehicle, 4)
-        VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT(vehicle, "FIB")
+        set_plate(vehicle)
     end
 
     if override_siren then
-        save_siren(vehicle)
+        set_siren(vehicle)
     end
 
-    --lights = {
-    --    {red=attach_to_vehicle(vehicle, "prop_air_conelight", {x=0.45,y=-0.85,z=0.55}, {x=0, y=0, z=0})}
-    --}
-    -- add_police_light(vehicle, {x=0.45,y=-0.85,z=0.55}, {x=0, y=0, z=0})
+    if override_additional_lights then
+        set_additional_lights(vehicle)
+    end
 
 end
 
@@ -425,7 +473,7 @@ local function depolicify_vehicle(vehicle)
     if override_neon then
         restore_neon(vehicle)
     end
-    if overide_horn then
+    if override_horn then
         restore_horn(vehicle)
     end
     if override_paint then
@@ -437,14 +485,9 @@ local function depolicify_vehicle(vehicle)
     if override_siren then
         restore_siren(vehicle)
     end
-    --for _, light in lights do
-    --    if ENTITY.IS_ENTITY_ATTACHED_TO_ENTITY(vehicle, light.red) then
-    --        entities.delete_by_handle(light.red)
-    --    end
-    --    if ENTITY.IS_ENTITY_ATTACHED_TO_ENTITY(vehicle, light.blue) then
-    --        entities.delete_by_handle(light.blue)
-    --    end
-    --end
+    if override_additional_lights then
+        restore_additional_lights(vehicle)
+    end
 end
 
 local policify_ticker = function()
@@ -511,25 +554,36 @@ menu.toggle(menu.my_root(), "Policify Vehicle", {"policify"}, "Enable Policify o
 end)
 
 menu.action(menu.my_root(), "Warning Blip", {"blip"}, "A quick siren blip to gain attention", function()
-    if attachments.siren then
-        AUDIO.BLIP_SIREN(attachments.siren)
+    if attachments.siren == nil then
+        util.toast("Error: No siren enabled")
     end
+    AUDIO.BLIP_SIREN(attachments.siren[1])
 end)
+
+--menu.action(menu.my_root(), "Police Report", {}, "Play police report", function()
+--    --AUDIO.SET_AUDIO_FLAG("AllowPoliceScannerWhenPlayerHasNoControl", 0)
+--    --AUDIO.SET_AUDIO_FLAG("OnlyAllowScriptTriggerPoliceScanner", 0)
+--    --AUDIO.SET_AUDIO_FLAG("PoliceScannerDisabled", 1)
+--    AUDIO.SET_AUDIO_FLAG("IsDirectorModeActive", 1)
+--    AUDIO.PLAY_POLICE_REPORT("LAMAR_1_POLICE_LOST", 0)
+--
+--end)
+
 
 menu.toggle(menu.my_root(), "Siren Sounds", {"sirens"}, "Enables siren sounds to notify other vehicles to pull over", function(on)
-    if attachments.siren then
-        if on then
-            AUDIO._SET_SIREN_KEEP_ON(attachments.siren, true)
-            VEHICLE.SET_VEHICLE_SIREN(attachments.siren, true)
-            AUDIO._TRIGGER_SIREN(attachments.siren, true)
-        else
-            AUDIO._SET_SIREN_KEEP_ON(attachments.siren, false)
-            VEHICLE.SET_VEHICLE_SIREN(attachments.siren, false)
-        end
+    if attachments.siren == nil then
+        util.toast("Error: No siren enabled")
+    end
+    local siren = attachments.siren[1]
+    if on then
+        AUDIO._SET_SIREN_KEEP_ON(siren, true)
+        VEHICLE.SET_VEHICLE_SIREN(siren, true)
+        AUDIO._TRIGGER_SIREN(siren, true)
+    else
+        AUDIO._SET_SIREN_KEEP_ON(siren, false)
+        VEHICLE.SET_VEHICLE_SIREN(siren, false)
     end
 end)
-
--- menu.divider(menu.my_root(), "Options")
 
 local options_menu = menu.list(menu.my_root(), "Options")
 
@@ -542,7 +596,7 @@ menu.toggle(options_menu, "Override Paint", {}, "If enabled, will override vehic
         override_paint = true
         if policify_tick_counter ~= nil then
             save_paint(policified_vehicle)
-            policify_vehicle(policified_vehicle)
+            set_paint(policified_vehicle)
         end
     else
         override_paint = false
@@ -557,7 +611,7 @@ menu.toggle(options_menu, "Override Headlights", {}, "If enabled, will override 
         override_headlights = true
         if policify_tick_counter ~= nil then
             save_headlights(policified_vehicle)
-            policify_vehicle(policified_vehicle)
+            set_headlights(policified_vehicle)
         end
     else
         override_headlights = false
@@ -572,7 +626,7 @@ menu.toggle(options_menu, "Override Neon", {}, "If enabled, will override vehicl
         override_neon = true
         if policify_tick_counter ~= nil then
             save_neon(policified_vehicle)
-            policify_vehicle(policified_vehicle)
+            set_neon(policified_vehicle)
         end
     else
         override_neon = false
@@ -584,13 +638,13 @@ end, true)
 
 menu.toggle(options_menu, "Override Horn", {}, "If enabled, will override vehicle horn to police horn", function(toggle)
     if toggle then
-        overide_horn = true
+        override_horn = true
         if policify_tick_counter ~= nil then
             save_horn(policified_vehicle)
-            policify_vehicle(policified_vehicle)
+            set_horn(policified_vehicle)
         end
     else
-        overide_horn = false
+        override_horn = false
         if policify_tick_counter ~= nil then
             restore_horn(policified_vehicle)
         end
@@ -602,7 +656,7 @@ menu.toggle(options_menu, "Override Plate", {}, "If enabled, will override vehic
         override_plate = true
         if policify_tick_counter ~= nil then
             save_plate(policified_vehicle)
-            policify_vehicle(policified_vehicle)
+            set_plate(policified_vehicle)
         end
     else
         override_plate = false
@@ -616,13 +670,26 @@ menu.toggle(options_menu, "Enable Siren", {}, "If enabled, will spawn an invisib
     if toggle then
         override_siren = true
         if policify_tick_counter ~= nil then
-            save_siren(policified_vehicle)
-            policify_vehicle(policified_vehicle)
+            set_siren(policified_vehicle)
         end
     else
         override_siren = false
         if policify_tick_counter ~= nil then
             restore_siren(policified_vehicle)
+        end
+    end
+end, true)
+
+menu.toggle(options_menu, "Attach Lights", {}, "If enabled, will attach additional lights", function(toggle)
+    if toggle then
+        override_additional_lights = true
+        if policify_tick_counter ~= nil then
+            set_additional_lights(policified_vehicle)
+        end
+    else
+        override_additional_lights = false
+        if policify_tick_counter ~= nil then
+            restore_additional_lights(policified_vehicle)
         end
     end
 end, true)
