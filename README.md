@@ -11,9 +11,15 @@ Mods include:
 * Flashing blue and red neon lights
 * FIB exempt license plate
 
-Triggers to control
-* Continuous siren audio
+Toggles to control
+* Siren audio
+* Flashing lights
+
+Quick Action Buttons
 * Quick warning blip sound
+
+Add/Edit Attachments
+* Solid and Spinning Police Lights
 
 ## Installation
 
