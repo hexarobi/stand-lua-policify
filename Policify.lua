@@ -1,4 +1,4 @@
--- Policify 1.11.2
+-- Policify 2.0
 -- by Hexarobi
 -- Enable Policify option to modify current vehicle, disable option to remove modifications
 -- Modifies horn, paint, neon, and headlights. Flashes headlights and neon between red and blue.
@@ -274,7 +274,7 @@ local available_attachments = {
         children={
             {
                 model="prop_wall_light_10a",
-                offset={ x=0, y=0, z=-1 },
+                offset={ x=0, y=0, z=0.75 },
                 rotation={ x=180, y=0, z=180 },
                 bone_index=1,
             },
@@ -283,12 +283,10 @@ local available_attachments = {
     {
         name="Blue Spinning Light",
         model="hei_prop_wall_light_10a_cr",
-        offset={x=0, y=0, z=0},
-        rotation={x=180, y=0, z=180},
         children={
             {
                 model="prop_wall_light_10b",
-                offset={ x=0, y=0, z=-1 },
+                offset={ x=0, y=0, z=0.75 },
                 rotation={x=180, y=0, z=180},
                 bone_index=1,
             },
@@ -301,7 +299,7 @@ local available_attachments = {
         children = {
             {
                 model="prop_wall_light_10b",
-                offset={ x=0, y=0, z=1 },
+                offset={ x=0, y=0, z=0.75 },
                 rotation={ x=180, y=0, z=180 },
                 bone_index=1,
             },
@@ -312,7 +310,7 @@ local available_attachments = {
             children = {
                 {
                     model="prop_wall_light_10a",
-                    offset={ x=0, y=0, z=1 },
+                    offset={ x=0, y=0, z=0.75 },
                     rotation={ x=180, y=0, z=0 },
                     bone_index=1,
                 },
@@ -322,13 +320,14 @@ local available_attachments = {
     {
         name="Blue Recessed Light",
         model="h4_prop_battle_lights_floorblue",
-        offset={ x=0, y=0, z=1 },
+        offset={ x=0, y=0, z=0.75 },
     },
     {
         name="Red Recessed Light",
         model="h4_prop_battle_lights_floorred",
-        offset={ x=0, y=0, z=1 },
+        offset={ x=0, y=0, z=0.75 },
     },
+    -- Flashing is still kinda wonky for networking
     --{
     --    name="Pair of Flashing Recessed Lights",
     --    model="h4_prop_battle_lights_floorred",
@@ -521,7 +520,7 @@ local function set_additional_vehicles(vehicle)
     local attachment = attach{
         root=vehicle,
         parent=vehicle,
-        name="Police Bike",
+        name="Siren (Invisible Police Bike)",
         attachments=attachments,
         model="policeb",
         type="vehicle",
