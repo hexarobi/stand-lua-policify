@@ -1,9 +1,9 @@
--- Policify 1.9
+-- Policify 1.11.2
 -- by Hexarobi
 -- Enable Policify option to modify current vehicle, disable option to remove modifications
 -- Modifies horn, paint, neon, and headlights. Flashes headlights and neon between red and blue.
 
-util.require_natives(1651208000)
+util.require_natives(1660775568)
 
 local function show_busyspinner(text)
     HUD.BEGIN_TEXT_COMMAND_BUSYSPINNER_ON("STRING")
@@ -255,12 +255,7 @@ local function restore_horn(vehicle)
     VEHICLE.SET_VEHICLE_SIREN(vehicle, false)
 end
 
-local attachments = {
-    vehicles = nil,
-    additional_lights = nil,
-}
-
-local attachments_handles = {}
+local attachments = {}
 
 -- Good props for cop lights
 -- prop_air_lights_02a blue
@@ -274,164 +269,90 @@ local attachments_handles = {}
 
 local available_attachments = {
     {
-        name="Solid Red Light",
-        model="prop_wall_light_10a",
-        offset={x=0,y=0,z=1},
-        rotation={x=180,y=0,z=180},
-    },
-
-    {
-        name = "Spinning Red Light",
-        model = "apa_mp_apa_yacht_radar_01a",
-        is_visible = false,
-        offset = { x=0, y=0, z=0 },
-        children = {
+        name="Red Spinning Light",
+        model="hei_prop_wall_light_10a_cr",
+        children={
             {
-                model = "apa_mp_apa_yacht_radar_01a",
-                is_visible = false,
-                offset = { x=0, y=0, z=-0.55 },
-                bone_index = 1,
-                children = {
-                    {
-                        model = "apa_mp_apa_yacht_radar_01a",
-                        is_visible = false,
-                        offset = { x = 0, y = 0, z = -0.55 },
-                        bone_index = 1,
-                        children = {
-                            {
-                                model = "apa_mp_apa_yacht_radar_01a",
-                                is_visible = false,
-                                offset = { x = 0, y = 0, z = -0.55 },
-                                bone_index = 1,
-                                children = {
-                                    {
-                                        model = "apa_mp_apa_yacht_radar_01a",
-                                        is_visible = false,
-                                        offset = { x = 0, y = 0, z = -0.55 },
-                                        bone_index = 1,
-                                        children = {
-                                            {
-                                                model = "prop_wall_light_10a",
-                                                offset = { x = 0, y = 0, z = 0.1 },
-                                                rotation = { x = 180, y = 0, z = 0 },
-                                                bone_index = 1,
-                                            },
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
+                model="prop_wall_light_10a",
+                offset={ x=0, y=0, z=-1 },
+                rotation={ x=180, y=0, z=180 },
+                bone_index=1,
             },
         },
     },
-
     {
-        name="Solid Red and Blue Lights",
-        model="prop_wall_light_10a",
-        is_visible=true,
-        offset={x=0.3, y=0, z=0.7},
-        rotation={x=180,y=0,z=0},
-        reflection={
-            model="prop_wall_light_10b",
-            is_visible=true,
-            reflection_axis={x=true, y=false, z=false},
-            rotation={x=0,y=0,z=180},
-        }
+        name="Blue Spinning Light",
+        model="hei_prop_wall_light_10a_cr",
+        offset={x=0, y=0, z=0},
+        rotation={x=180, y=0, z=180},
+        children={
+            {
+                model="prop_wall_light_10b",
+                offset={ x=0, y=0, z=-1 },
+                rotation={x=180, y=0, z=180},
+                bone_index=1,
+            },
+        },
     },
-
     {
-        name="Spinning Red and Blue Lights",
-        offset={ x=0.3, y=0, z=0.7 },
-        model = "apa_mp_apa_yacht_radar_01a",
-        is_visible = false,
+        name="Pair of Spinning Lights",
+        model="hei_prop_wall_light_10a_cr",
+        offset={ x=0.3, y=0, z=0 },
         children = {
             {
-                model = "apa_mp_apa_yacht_radar_01a",
-                is_visible = false,
-                offset = { x=0, y=0, z=-0.55 },
-                bone_index = 1,
-                children = {
-                    {
-                        model = "apa_mp_apa_yacht_radar_01a",
-                        is_visible = false,
-                        offset = { x=0, y=0, z=-0.55 },
-                        bone_index = 1,
-                        children = {
-                            {
-                                model = "apa_mp_apa_yacht_radar_01a",
-                                is_visible = false,
-                                offset = { x=0, y=0, z=-0.55 },
-                                bone_index = 1,
-                                children = {
-                                    {
-                                        model = "apa_mp_apa_yacht_radar_01a",
-                                        is_visible = false,
-                                        offset = { x=0, y=0, z=-0.55 },
-                                        bone_index = 1,
-                                        children = {
-                                            {
-                                                model = "prop_wall_light_10a",
-                                                offset = { x=0, y=0, z=-1 },
-                                                rotation = { x=180, y=0, z=0 },
-                                                bone_index = 1,
-                                            },
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
+                model="prop_wall_light_10b",
+                offset={ x=0, y=0, z=1 },
+                rotation={ x=180, y=0, z=180 },
+                bone_index=1,
             },
         },
         reflection={
-            model = "apa_mp_apa_yacht_radar_01a",
-            is_visible = false,
+            model="hei_prop_wall_light_10a_cr",
             reflection_axis={ x=true, y=false, z=false },
             children = {
                 {
-                    model = "apa_mp_apa_yacht_radar_01a",
-                    is_visible = false,
-                    offset = { x=0, y=0, z=-0.55 },
-                    bone_index = 1,
-                    children = {
-                        {
-                            model = "apa_mp_apa_yacht_radar_01a",
-                            is_visible = false,
-                            offset = { x=0, y=0, z=-0.55 },
-                            bone_index = 1,
-                            children = {
-                                {
-                                    model = "apa_mp_apa_yacht_radar_01a",
-                                    is_visible = false,
-                                    offset = { x=0, y=0, z=-0.55 },
-                                    bone_index = 1,
-                                    children = {
-                                        {
-                                            model = "apa_mp_apa_yacht_radar_01a",
-                                            is_visible = false,
-                                            offset = { x=0, y=0, z=-0.55 },
-                                            bone_index = 1,
-                                            children = {
-                                                {
-                                                    model = "prop_wall_light_10b",
-                                                    offset = { x=0, y=0, z=-1 },
-                                                    rotation = { x=180, y=0, z=180 },
-                                                    bone_index = 1,
-                                                },
-                                            },
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                    },
+                    model="prop_wall_light_10a",
+                    offset={ x=0, y=0, z=1 },
+                    rotation={ x=180, y=0, z=0 },
+                    bone_index=1,
                 },
             },
         }
-    }
+    },
+    {
+        name="Blue Recessed Light",
+        model="h4_prop_battle_lights_floorblue",
+        offset={ x=0, y=0, z=1 },
+    },
+    {
+        name="Red Recessed Light",
+        model="h4_prop_battle_lights_floorred",
+        offset={ x=0, y=0, z=1 },
+    },
+    --{
+    --    name="Pair of Flashing Recessed Lights",
+    --    model="h4_prop_battle_lights_floorred",
+    --    offset={ x=0.3, y=0, z=1 },
+    --    flash_start_on=false,
+    --    reflection={
+    --        model="h4_prop_battle_lights_floorblue",
+    --        reflection_axis={ x=true, y=false, z=false },
+    --        flash_start_on=true,
+    --    }
+    --},
+    --{
+    --    name="Pair of Alternating Recessed Lights",
+    --    model="h4_prop_battle_lights_floorred",
+    --    offset={ x=0.3, y=0, z=1 },
+    --    flash_start_on=true,
+    --    flash_model="h4_prop_battle_lights_floorblue",
+    --    reflection={
+    --        model="h4_prop_battle_lights_floorred",
+    --        reflection_axis={ x=true, y=false, z=false },
+    --        flash_start_on=true,
+    --        flash_model="h4_prop_battle_lights_floorblue",
+    --    }
+    --}
 }
 
 local function load_hash(hash)
@@ -458,26 +379,6 @@ local function attach_entity_to_entity(args)
     end
 end
 
-local function set_no_collision_with_all_attachments_objects(args)
-    ENTITY.SET_ENTITY_NO_COLLISION_ENTITY(args.root, args.handle)
-    for _, handle in pairs(attachments_handles) do
-        ENTITY.SET_ENTITY_NO_COLLISION_ENTITY(args.handle, handle)
-    end
-    table.insert(attachments_handles, args.handle)
-end
-
-local function insert_attachment_object(args)
-    if args.parent == nil or args.parent == args.root then
-        table.insert(args.handles, args)
-    else
-        for _, attachment in pairs(args.handles) do
-            if attachment.handle == args.root then
-                table.insert(attachment.objects, args)
-            end
-        end
-    end
-end
-
 local function attach(args)
     local hash = util.joaat(args.model)
     if not STREAMING.IS_MODEL_VALID(hash) or (args.type ~= "vehicle" and STREAMING.IS_MODEL_A_VEHICLE(hash)) then
@@ -494,30 +395,32 @@ local function attach(args)
     end
 
     ENTITY.FREEZE_ENTITY_POSITION(args.root, true)
-
     if args.type == "vehicle" then
         local heading = ENTITY.GET_ENTITY_HEADING(args.root)
         args.handle = entities.create_vehicle(hash, args.offset, heading)
     else
         local pos = ENTITY.GET_ENTITY_COORDS(args.root)
-        args.handle = OBJECT.CREATE_OBJECT(hash, pos.x, pos.y, pos.z, false, false, 0)
-        -- handle = entities.create_object(hash, ENTITY.GET_ENTITY_COORDS(args.root))
+        args.handle = OBJECT.CREATE_OBJECT_NO_OFFSET(hash, pos.x, pos.y, pos.z, true, true, false)
+        --args.handle = entities.create_object(hash, ENTITY.GET_ENTITY_COORDS(args.root))
     end
-    --STREAMING.SET_MODEL_AS_NO_LONGER_NEEDED(hash)
+
+    if args.is_visible ~= nil then
+        ENTITY.SET_ENTITY_VISIBLE(args.handle, args.is_visible, 0)
+    end
+    if args.flash_start_on ~= nil then
+        ENTITY.SET_ENTITY_VISIBLE(args.handle, args.flash_start_on, 0)
+    end
+
     ENTITY.SET_ENTITY_INVINCIBLE(args.handle, false)
     ENTITY.SET_ENTITY_HAS_GRAVITY(args.handle, false)
 
     attach_entity_to_entity(args)
-    set_no_collision_with_all_attachments_objects(args)
-    insert_attachment_object(args)
 
-    if args.is_visible == false then
-        ENTITY.SET_ENTITY_ALPHA(args.handle, 0, false)
+    ENTITY.SET_ENTITY_NO_COLLISION_ENTITY(args.root, args.handle)
+    for _, attachment in pairs(attachments) do
+        ENTITY.SET_ENTITY_NO_COLLISION_ENTITY(args.handle, attachment.handle)
     end
-
-    -- local network_handle = NETWORK.OBJ_TO_NET(handle)
-    --ENTITY.SET_ENTITY_AS_MISSION_ENTITY(args.handle)
-    --ENTITY._SET_ENTITY_CLEANUP_BY_ENGINE(args.handle, false)
+    table.insert(attachments, args)
 
     ENTITY.FREEZE_ENTITY_POSITION(args.root, false)
 
@@ -550,93 +453,134 @@ local function move_attachment(attachment)
 end
 
 local function detach(attachment)
-    if attachment.children then
-        for _, child in pairs(attachment.children) do
+    if attachment.spawned_children then
+        for _, child in pairs(attachment.spawned_children) do
             detach(child)
         end
     end
-    if attachment.reflection then
-        detach(attachment.reflection)
-    end
-    for i, handle in pairs(attachment.handles) do
-        if handle == attachment.handle then
-            table.remove(attachments.handles, i)
+    for i, attachment2 in pairs(attachments) do
+        if attachment2.handle == attachment.handle then
+            table.remove(attachments, i)
         end
     end
     entities.delete_by_handle(attachment.handle)
 end
 
+function table.table_copy(obj)
+    if type(obj) ~= 'table' then return obj end
+    local res = setmetatable({}, getmetatable(obj))
+    for k, v in pairs(obj) do res[table.table_copy(k)] = table.table_copy(v) end
+    return res
+end
 
-local function attach_available_attachment_to_vehicle(root_vehicle, available_attachment, attachments_list)
-    available_attachment.root = root_vehicle
-    available_attachment.handles = attachments_list
-    local attachment = attach(available_attachment)
-    local parent = available_attachment.handle
+function table.is_equal( a, b )
+    return table.concat(a) == table.concat(b)
+end
+
+local attachment_counter
+local attachment_name
+local function attach_available_attachment_to_vehicle(root_vehicle, available_attachment)
+    attachment_counter = attachment_counter + 1
+    local attachment_args = table.table_copy(available_attachment)
+    attachment_args.root = root_vehicle
+    if attachment_name == nil then
+        attachment_name = available_attachment.name
+    end
+    if attachment_counter == 1 then
+        attachment_args.name = attachment_name .. " (Base)"
+    else
+        attachment_args.name = attachment_name .. " (Child #" .. attachment_counter-1 .. ")"
+    end
+    local attachment = attach(attachment_args)
+    attachment_args.spawned_children = {}
     if available_attachment.children then
         for _, child in pairs(available_attachment.children) do
-            child.parent = parent
-            attach_available_attachment_to_vehicle(root_vehicle, child, attachments_list)
-            parent = child
+            child.parent = attachment.handle
+            local spawned = attach_available_attachment_to_vehicle(root_vehicle, child)
+            table.insert(attachment_args.spawned_children, spawned)
         end
     end
-    if available_attachment.reflection then
-        local reflection = get_reflection_with_offsets(available_attachment)
-        attach_available_attachment_to_vehicle(root_vehicle, reflection, attachments_list)
+    if attachment.flash_model then
+        local flash_version = {
+            model=attachment.flash_model,
+            flash_start_on=(not attachment.flash_start_on),
+            parent=attachment.handle
+        }
+        local spawned = attach_available_attachment_to_vehicle(root_vehicle, flash_version)
+        table.insert(attachment_args.spawned_children, spawned)
+    end
+    if attachment_args.reflection then
+        local reflection = get_reflection_with_offsets(attachment_args)
+        local spawned = attach_available_attachment_to_vehicle(root_vehicle, reflection)
+        table.insert(attachment_args.spawned_children, spawned)
     end
     return attachment
 end
 
 local function set_additional_vehicles(vehicle)
-    if attachments.vehicles ~= nil then
-        util.toast("Error setting siren. Already set")
-        return
-    end
-    attachments.vehicles = {}
-    local args = attach{ root=vehicle, parent=vehicle, handles=attachments.vehicles, model="policeb", type="vehicle", is_visible=false}
-    AUDIO.SET_SIREN_WITH_NO_DRIVER(args.handle, true)
-    AUDIO._SET_SIREN_KEEP_ON(args.handle, true)
-    VEHICLE.SET_VEHICLE_HAS_MUTED_SIRENS(args.handle, false)
-    VEHICLE.SET_VEHICLE_SIREN(args.handle, true)
+    local attachment = attach{
+        root=vehicle,
+        parent=vehicle,
+        name="Police Bike",
+        attachments=attachments,
+        model="policeb",
+        type="vehicle",
+        is_visible=false
+    }
+
+    local ped_hash = util.joaat("s_m_m_pilot_01")
+    load_hash(ped_hash)
+    local pos = ENTITY.GET_OFFSET_FROM_ENTITY_IN_WORLD_COORDS(attachment.handle, 0, 0, 0)
+    local pilot = entities.create_ped(1, ped_hash, pos, 0.0)
+    PED.SET_PED_INTO_VEHICLE(pilot, attachment.handle, -1)
+    ENTITY.SET_ENTITY_VISIBLE(pilot, false, 0)
+
 end
 
 local function set_additional_lights()
-    if attachments.additional_lights ~= nil then
-        util.toast("Error setting additional lights. Already set")
-        return
-    end
-    attachments.additional_lights = {}
+    -- Nothing
 end
 
 local function restore_additional_lights()
-    if attachments.additional_lights ~= nil then
-        for _, attachment in pairs(attachments.additional_lights) do
+    for _, attachment in pairs(attachments) do
+        if attachment.type ~= "vehicle" then
             detach(attachment)
         end
-        attachments.additional_lights = nil
     end
 end
 
 local function activate_sirens()
-    for _, args in pairs(attachments.vehicles) do
-        AUDIO._SET_SIREN_KEEP_ON(args.handle, true)
-        VEHICLE.SET_VEHICLE_SIREN(args.handle, true)
-        AUDIO._TRIGGER_SIREN(args.handle, true)
+    for _, attachment in pairs(attachments) do
+        if attachment.type == "vehicle" then
+
+            AUDIO.SET_SIREN_WITH_NO_DRIVER(attachment.handle, true)
+            VEHICLE.SET_VEHICLE_HAS_MUTED_SIRENS(attachment.handle, false)
+            VEHICLE.SET_VEHICLE_SIREN(attachment.handle, true)
+            AUDIO._TRIGGER_SIREN(attachment.handle, true)
+            AUDIO._SET_SIREN_KEEP_ON(attachment.handle, true)
+
+            --util.yield(2000)
+            --PED.KNOCK_PED_OFF_VEHICLE(pilot)
+            --util.yield(3000)
+            --entities.delete_by_handle(pilot)
+        end
     end
 end
 
 local function deactivate_sirens()
-    for _, args in pairs(attachments.vehicles) do
-        AUDIO._SET_SIREN_KEEP_ON(args.handle, false)
-        VEHICLE.SET_VEHICLE_SIREN(args.handle, false)
+    for _, attachment in pairs(attachments) do
+        if attachment.type == "vehicle" then
+            AUDIO._SET_SIREN_KEEP_ON(attachment.handle, false)
+            VEHICLE.SET_VEHICLE_SIREN(attachment.handle, false)
+        end
     end
 end
 
 local function restore_additional_vehicles()
-    if attachments.vehicles ~= nil then
-        for _, args in pairs(attachments.vehicles) do
-            entities.delete_by_handle(args.handle)
+    for _, attachment in pairs(attachments) do
+        if attachment.type == "vehicle" then
+            detach(attachment)
         end
-        attachments.vehicles = nil
     end
 end
 
@@ -742,18 +686,11 @@ local function policify_tick_ying()
             VEHICLE._SET_VEHICLE_NEON_LIGHTS_COLOUR(policified_vehicle, 0, 0, 255)
         end
     end
-    --for _, light in lights do
-    --    ENTITY.SET_ENTITY_ROTATION(light.red, 90, 0, 0, 1, true)
-    --    --local pos = ENTITY.GET_ENTITY_COORDS(light.red, 1)
-    --    --local pos = ENTITY.GET_OFFSET_FROM_ENTITY_IN_WORLD_COORDS(light.red, 0, 0, 0)
-    --    --util.toast("x="..pos.x.." y="..pos.y.." z="..pos.z)
-    --    --ENTITY.SET_ENTITY_COORDS(light.red, pos.x, pos.y, pos.z, true, false, false, true)
-    --    --local pos2 = ENTITY.GET_ENTITY_COORDS(light.red, 1)
-    --    --util.toast("pos.x="..pos.x.." pos2.x="..pos2.x)
-    --    --ENTITY.SET_ENTITY_ALPHA(light.red, 255)
-    --    --ENTITY.SET_ENTITY_ALPHA(light.red, 0)
-    --    -- ENTITY.SET_ENTITY_LIGHTS(light.red, true)
-    --end
+    for _, attachment in pairs(attachments) do
+        if attachment.flash_start_on ~= nil then
+            ENTITY.SET_ENTITY_VISIBLE(attachment.handle, (not attachment.flash_start_on), 0)
+        end
+    end
 end
 
 local function policify_tick_yang()
@@ -765,12 +702,11 @@ local function policify_tick_yang()
             VEHICLE._SET_VEHICLE_NEON_LIGHTS_COLOUR(policified_vehicle, 255, 0, 0)
         end
     end
-    --for _, light in lights do
-    --    ENTITY.SET_ENTITY_ROTATION(light.red, 0, 0, 0, 1, true)
-    --    -- ENTITY.SET_ENTITY_LIGHTS(light.red, false)
-    --    --ENTITY.SET_ENTITY_ALPHA(light.red, 255)
-    --    -- ENTITY.SET_ENTITY_ALPHA(light.blue, 255)
-    --end
+    for _, attachment in pairs(attachments) do
+        if attachment.flash_start_on ~= nil then
+            ENTITY.SET_ENTITY_VISIBLE(attachment.handle, attachment.flash_start_on, 0)
+        end
+    end
 end
 
 local policify_ticker = function()
@@ -825,11 +761,75 @@ menu.toggle(menu.my_root(), "Policify Vehicle", {"policify"}, "Enable Policify o
 end)
 
 menu.action(menu.my_root(), "Siren Warning Blip", {"blip"}, "A quick siren blip to gain attention", function()
-    if attachments.vehicles == nil then
-        util.toast("Error: No siren enabled")
+    for _, attachment in pairs(attachments) do
+        if attachment.type == "vehicle" then
+            AUDIO.BLIP_SIREN(attachment.handle)
+            return
+        end
     end
-    AUDIO.BLIP_SIREN(attachments.vehicles[1].handle)
 end)
+
+--POLICE_REPORTS = {
+--    "DLC_GR_Div_Scanner",
+--    "LAMAR_1_POLICE_LOST",
+--    "SCRIPTED_SCANNER_REPORT_AH_3B_01",
+--    "SCRIPTED_SCANNER_REPORT_AH_MUGGING_01",
+--    "SCRIPTED_SCANNER_REPORT_AH_PREP_01",
+--    "SCRIPTED_SCANNER_REPORT_AH_PREP_02",
+--    "SCRIPTED_SCANNER_REPORT_ARMENIAN_1_01",
+--    "SCRIPTED_SCANNER_REPORT_ARMENIAN_1_02",
+--    "SCRIPTED_SCANNER_REPORT_ASS_BUS_01",
+--    "SCRIPTED_SCANNER_REPORT_ASS_MULTI_01",
+--    "SCRIPTED_SCANNER_REPORT_BARRY_3A_01",
+--    "SCRIPTED_SCANNER_REPORT_BS_2A_01",
+--    "SCRIPTED_SCANNER_REPORT_BS_2B_01",
+--    "SCRIPTED_SCANNER_REPORT_BS_2B_02",
+--    "SCRIPTED_SCANNER_REPORT_BS_2B_03",
+--    "SCRIPTED_SCANNER_REPORT_BS_2B_04",
+--    "SCRIPTED_SCANNER_REPORT_BS_PREP_A_01",
+--    "SCRIPTED_SCANNER_REPORT_BS_PREP_B_01",
+--    "SCRIPTED_SCANNER_REPORT_CAR_STEAL_2_01",
+--    "SCRIPTED_SCANNER_REPORT_CAR_STEAL_4_01",
+--    "SCRIPTED_SCANNER_REPORT_DH_PREP_1_01",
+--    "SCRIPTED_SCANNER_REPORT_FIB_1_01",
+--    "SCRIPTED_SCANNER_REPORT_FIN_C2_01",
+--    "SCRIPTED_SCANNER_REPORT_Franklin_2_01",
+--    "SCRIPTED_SCANNER_REPORT_FRANLIN_0_KIDNAP",
+--    "SCRIPTED_SCANNER_REPORT_GETAWAY_01",
+--    "SCRIPTED_SCANNER_REPORT_JOSH_3_01",
+--    "SCRIPTED_SCANNER_REPORT_JOSH_4_01",
+--    "SCRIPTED_SCANNER_REPORT_JSH_2A_01",
+--    "SCRIPTED_SCANNER_REPORT_JSH_2A_02",
+--    "SCRIPTED_SCANNER_REPORT_JSH_2A_03",
+--    "SCRIPTED_SCANNER_REPORT_JSH_2A_04",
+--    "SCRIPTED_SCANNER_REPORT_JSH_2A_05",
+--    "SCRIPTED_SCANNER_REPORT_JSH_PREP_1A_01",
+--    "SCRIPTED_SCANNER_REPORT_JSH_PREP_1B_01",
+--    "SCRIPTED_SCANNER_REPORT_JSH_PREP_2A_01",
+--    "SCRIPTED_SCANNER_REPORT_JSH_PREP_2A_02",
+--    "SCRIPTED_SCANNER_REPORT_LAMAR_1_01",
+--    "SCRIPTED_SCANNER_REPORT_MIC_AMANDA_01",
+--    "SCRIPTED_SCANNER_REPORT_NIGEL_1A_01",
+--    "SCRIPTED_SCANNER_REPORT_NIGEL_1D_01",
+--    "SCRIPTED_SCANNER_REPORT_PS_2A_01",
+--    "SCRIPTED_SCANNER_REPORT_PS_2A_02",
+--    "SCRIPTED_SCANNER_REPORT_PS_2A_03",
+--    "SCRIPTED_SCANNER_REPORT_SEC_TRUCK_01",
+--    "SCRIPTED_SCANNER_REPORT_SEC_TRUCK_02",
+--    "SCRIPTED_SCANNER_REPORT_SEC_TRUCK_03",
+--    "SCRIPTED_SCANNER_REPORT_SIMEON_01",
+--    "SCRIPTED_SCANNER_REPORT_Sol_3_01",
+--    "SCRIPTED_SCANNER_REPORT_Sol_3_02"
+--}
+--
+--chat_commands.add{
+--    command="report",
+--    help="Play a random police report",
+--    func=function(pid, commands)
+--        AUDIO.PLAY_POLICE_REPORT("SCRIPTED_SCANNER_REPORT_SEC_TRUCK_02", 1)
+--        AUDIO.START_AUDIO_SCENE("SCRIPTED_SCANNER_REPORT_SEC_TRUCK_02")
+--    end
+--}
 
 --menu.action(menu.my_root(), "Police Report", {}, "Play police report", function()
 --    --AUDIO.SET_AUDIO_FLAG("AllowPoliceScannerWhenPlayerHasNoControl", 0)
@@ -852,47 +852,55 @@ menu.toggle(menu.my_root(), "Toggle Lights", {"coplights"}, "Toggle vehicle ligh
 end)
 
 menu.toggle(menu.my_root(), "Toggle Sirens", {"copsirens"}, "Toggle vehicle sirens", function(on)
-    if attachments.vehicles == nil then
-        util.toast("Error: No siren enabled")
-    end
-    is_active_sirens = on
-    if is_active_sirens then
-        activate_sirens()
-    else
-        deactivate_sirens()
+    for _, attachment in pairs(attachments) do
+        if attachment.type == "vehicle" then
+            is_active_sirens = on
+            if is_active_sirens then
+                activate_sirens()
+            else
+                deactivate_sirens()
+            end
+            return
+        end
     end
 end)
+
+menu.action(menu.my_root(), "Call for Backup", {}, "Call for backup from nearby units", function(toggle)
+    local incident_id = memory.alloc(8)
+    MISC.CREATE_INCIDENT_WITH_ENTITY(7, PLAYER.PLAYER_PED_ID(), 3, 3, incident_id)
+    AUDIO.PLAY_POLICE_REPORT("SCRIPTED_SCANNER_REPORT_PS_2A_01", 0)
+end, true)
 
 local attach_additional_lights_menu = menu.list(menu.my_root(), "Add Attachment")
 local edit_attachments_menu = menu.list(menu.my_root(), "Edit Attachments")
 
 local function rebuild_edit_attachments_menu()
-    for _, attachment in pairs(attachments.additional_lights) do
+    for _, attachment in pairs(attachments) do
         if not attachment.is_added_to_edit_menu then
-            local edit_menu = menu.list(edit_attachments_menu, attachment.name)
+            local edit_menu = menu.list(edit_attachments_menu, attachment.name or "unknow")
             menu.divider(edit_menu, "Position")
-            menu.slider_float(edit_menu, "X: Left / Right", {}, "", -500000, 500000, math.floor(attachment.offset.x * 100), 1, function(value, prev_value)
+            menu.slider_float(edit_menu, "X: Left / Right", {}, "", -500000, 500000, math.floor(attachment.offset.x * 100), 1, function(value)
                 attachment.offset.x = value / 100
                 move_attachment(attachment)
             end)
-            menu.slider_float(edit_menu, "Y: Forward / Back", {}, "", -500000, 500000, math.floor(attachment.offset.y * -100), 1, function(value, prev_value)
+            menu.slider_float(edit_menu, "Y: Forward / Back", {}, "", -500000, 500000, math.floor(attachment.offset.y * -100), 1, function(value)
                 attachment.offset.y = value / -100
                 move_attachment(attachment)
             end)
-            menu.slider_float(edit_menu, "Z: Up / Down", {}, "", -500000, 500000, math.floor(attachment.offset.z * -100), 1, function(value, prev_value)
+            menu.slider_float(edit_menu, "Z: Up / Down", {}, "", -500000, 500000, math.floor(attachment.offset.z * -100), 1, function(value)
                 attachment.offset.z = value / -100
                 move_attachment(attachment)
             end)
             menu.divider(edit_menu, "Rotation")
-            menu.slider(edit_menu, "X: Pitch", {}, "", -175, 180, math.floor(attachment.rotation.x), 5, function(value, prev_value)
+            menu.slider(edit_menu, "X: Pitch", {}, "", -175, 180, math.floor(attachment.rotation.x), 5, function(value)
                 attachment.rotation.x = value
                 move_attachment(attachment)
             end)
-            menu.slider(edit_menu, "Y: Roll", {}, "", -175, 180, math.floor(attachment.rotation.y), 5, function(value, prev_value)
+            menu.slider(edit_menu, "Y: Roll", {}, "", -175, 180, math.floor(attachment.rotation.y), 5, function(value)
                 attachment.rotation.y = value
                 move_attachment(attachment)
             end)
-            menu.slider(edit_menu, "Z: Yaw", {}, "", -175, 180, math.floor(attachment.rotation.z), 5, function(value, prev_value)
+            menu.slider(edit_menu, "Z: Yaw", {}, "", -175, 180, math.floor(attachment.rotation.z), 5, function(value)
                 attachment.rotation.z = value
                 move_attachment(attachment)
             end)
@@ -904,6 +912,7 @@ local function rebuild_edit_attachments_menu()
             menu.action(edit_menu, "Delete", {}, "", function()
                 detach(attachment)
                 menu.delete(edit_menu)
+                rebuild_edit_attachments_menu()
             end)
             attachment.is_added_to_edit_menu = true
         end
@@ -912,7 +921,9 @@ end
 
 for _, available_attachment in pairs(available_attachments) do
     menu.action(attach_additional_lights_menu, available_attachment.name, {}, "", function()
-        attach_available_attachment_to_vehicle(policified_vehicle, available_attachment, attachments.additional_lights)
+        attachment_counter = 0
+        attachment_name = nil
+        attach_available_attachment_to_vehicle(policified_vehicle, available_attachment, attachments)
         rebuild_edit_attachments_menu()
     end)
 end
@@ -1021,6 +1032,10 @@ menu.toggle(options_menu, "Enable Attached Lights", {}, "If enabled, will show a
             restore_additional_lights(policified_vehicle)
         end
     end
+end, true)
+
+menu.toggle(options_menu, "View Nearby Units", {}, "If enabled, will show nearby police units on minimap", function(toggle)
+    PLAYER.SET_POLICE_RADAR_BLIPS(toggle)
 end, true)
 
 util.create_tick_handler(function()
