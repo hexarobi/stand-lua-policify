@@ -1,4 +1,4 @@
--- Policify 2.0
+-- Policify 2.1
 -- by Hexarobi
 -- Enable Policify option to modify current vehicle, disable option to remove modifications
 -- Modifies horn, paint, neon, and headlights. Flashes headlights and neon between red and blue.
@@ -326,6 +326,96 @@ local available_attachments = {
         name="Red Recessed Light",
         model="h4_prop_battle_lights_floorred",
         offset={ x=0, y=0, z=0.75 },
+    },
+    {
+        name="Pair of Recessed Lights",
+        model="h4_prop_battle_lights_floorred",
+        offset={ x=0.3, y=0, z=1 },
+        reflection={
+            model="h4_prop_battle_lights_floorblue",
+            reflection_axis={ x=true, y=false, z=false },
+        }
+    },
+    {
+        name="Riot Shield",
+        model="prop_riot_shield",
+        offset={ x=0, y=0, z=0 },
+        rotation={ x=180, y=180, z=0 },
+    },
+    {
+        name="Police Cruiser",
+        type="vehicle",
+        model="police",
+    },
+    {
+        name="Police Buffalo",
+        type="vehicle",
+        model="police2",
+    },
+    {
+        name="Police Sports",
+        type="vehicle",
+        model="police3",
+    },
+    {
+        name="Police Van",
+        type="vehicle",
+        model="policet",
+    },
+    {
+        name="Police Bike",
+        type="vehicle",
+        model="policeb",
+    },
+    {
+        name="FIB Cruiser",
+        type="vehicle",
+        model="fbi",
+    },
+    {
+        name="FIB SUV",
+        type="vehicle",
+        model="fbi2",
+    },
+    {
+        name="Sheriff Cruiser",
+        type="vehicle",
+        model="sheriff",
+    },
+    {
+        name="Sheriff SUV",
+        type="vehicle",
+        model="sheriff2",
+    },
+    {
+        name="Unmarked Cruiser",
+        type="vehicle",
+        model="police3",
+    },
+    {
+        name="Snowy Rancher",
+        type="vehicle",
+        model="policeold1",
+    },
+    {
+        name="Snowy Cruiser",
+        type="vehicle",
+        model="policeold2",
+    },
+    {
+        name="Park Ranger",
+        type="vehicle",
+        model="pranger",
+    },
+    {
+        name="Riot Van",
+        type="vehicle",
+        model="rior",
+    },
+    {
+        name="Riot Control Vehicle (RCV)",
+        type="vehicle",
+        model="riot2",
     },
     -- Flashing is still kinda wonky for networking
     --{
