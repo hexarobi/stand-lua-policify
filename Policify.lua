@@ -1262,7 +1262,9 @@ menu.action(script_meta_menu, "Auto Update", {}, "Attempt to auto-update to late
         file:write(result:gsub("\r", "") .. "\n") -- have to strip out \r for some reason, or it makes two lines. ty windows
         file:close()
         util.toast("Script version refreshed. Restart to apply any updates.")
-    end, on_err)
+    end, function()
+        util.toast("Script update failed to download.")
+    end)
     async_http.dispatch()
 end)
 
