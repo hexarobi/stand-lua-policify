@@ -3,7 +3,7 @@
 -- Enable Policify option to modify current vehicle, disable option to remove modifications
 -- Modifies horn, paint, ne[on, and headlights. Flashes headlights and neon between red and blue.
 
-local SCRIPT_VERSION = "2.3"
+local SCRIPT_VERSION = "2.4"
 
 util.require_natives(1660775568)
 
@@ -262,7 +262,10 @@ local attached_invis_police_sirens = {}
 
 local config = {
     plate_text = "FIB",
-    siren_model = "police"
+    siren_attachment = {
+        name="Police Cruiser",
+        model="policeb",
+    }
 }
 
 -- Good props for cop lights
@@ -281,57 +284,82 @@ local available_attachments = {
         objects={
             {
                 name = "Red Spinning Light",
-                model = "hei_prop_wall_alarm_on",
-                rotation = { x = 90, y = 0, z = 0 },
-                offset = { x = 0, y = 0, z = 0.5 },
+                model = "hei_prop_wall_light_10a_cr",
+                offset = { x = 0, y = 0, z = 1 },
+                rotation = { x = 180, y = 0, z = 0 },
+                is_light_disabled = true,
                 children = {
                     {
                         model = "prop_wall_light_10a",
-                        offset = { x = 0, y = 0, z = 0.1 },
-                        rotation = { x = 0, y = 0, z = 180 },
+                        offset = { x = 0, y = 0.01, z = 0 },
+                        is_light_disabled = false,
                         bone_index = 1,
                     },
                 },
             },
             {
                 name = "Blue Spinning Light",
-                model = "hei_prop_wall_alarm_on",
+                model = "hei_prop_wall_light_10a_cr",
+                offset = { x = 0, y = 0, z = 1 },
+                rotation = { x = 180, y = 0, z = 0 },
+                is_light_disabled = true,
                 children = {
                     {
                         model = "prop_wall_light_10b",
-                        offset = { x = 0, y = 0, z = 0.1 },
-                        rotation = { x = 180, y = 0, z = 180 },
+                        offset = { x = 0, y = 0.01, z = 0 },
+                        is_light_disabled = false,
                         bone_index = 1,
                     },
                 },
             },
             {
+                name = "Yellow Spinning Light",
+                model = "hei_prop_wall_light_10a_cr",
+                offset = { x = 0, y = 0, z = 1 },
+                rotation = { x = 180, y = 0, z = 0 },
+                is_light_disabled = true,
+                children = {
+                    {
+                        model = "prop_wall_light_10c",
+                        offset = { x = 0, y = 0.01, z = 0 },
+                        is_light_disabled = false,
+                        bone_index = 1,
+                    },
+                },
+            },
+
+            {
                 name = "Pair of Spinning Lights",
                 model = "hei_prop_wall_light_10a_cr",
-                offset = { x = 0.3, y = 0, z = 0 },
+                offset = { x = 0.3, y = 0, z = 1 },
+                rotation = { x = 180, y = 0, z = 0 },
+                is_light_disabled = true,
                 children = {
                     {
                         model = "prop_wall_light_10b",
-                        offset = { x = 0, y = 0, z = 0.75 },
-                        rotation = { x = 180, y = 0, z = 180 },
+                        offset = { x = 0, y = 0.01, z = 0 },
+                        is_light_disabled = false,
                         bone_index = 1,
                     },
                 },
                 reflection = {
                     model = "hei_prop_wall_light_10a_cr",
                     reflection_axis = { x = true, y = false, z = false },
+                    is_light_disabled = true,
                     children = {
                         {
                             model = "prop_wall_light_10a",
-                            offset = { x = 0, y = 0, z = 0.75 },
-                            rotation = { x = 180, y = 0, z = 0 },
+                            offset = { x = 0, y = 0.01, z = 0 },
+                            rotation = { x = 0, y = 0, z = 180 },
+                            is_light_disabled = false,
                             bone_index = 1,
                         },
                     },
                 }
             },
+
             {
-                name = "Short Light",
+                name = "Short Spinning Red Light",
                 model = "hei_prop_wall_alarm_on",
                 offset = { x = 0, y = 0, z = 1 },
                 rotation = { x = -90, y = 0, z = 0 },
@@ -348,7 +376,7 @@ local available_attachments = {
                 offset = { x = 0, y = 0, z = 0.75 },
             },
             {
-                name = "Pair of Recessed Lights",
+                name = "Red/Blue Pair of Recessed Lights",
                 model = "h4_prop_battle_lights_floorred",
                 offset = { x = 0.3, y = 0, z = 1 },
                 reflection = {
@@ -356,6 +384,41 @@ local available_attachments = {
                     reflection_axis = { x = true, y = false, z = false },
                 }
             },
+            {
+                name = "Blue/Red Pair of Recessed Lights",
+                model = "h4_prop_battle_lights_floorblue",
+                offset = { x = 0.3, y = 0, z = 1 },
+                reflection = {
+                    model = "h4_prop_battle_lights_floorred",
+                    reflection_axis = { x = true, y = false, z = false },
+                }
+            },
+
+            -- Flashing is still kinda wonky for networking
+            {
+                name="Flashing Recessed Lights",
+                model="h4_prop_battle_lights_floorred",
+                offset={ x=0.3, y=0, z=1 },
+                flash_start_on=false,
+                reflection={
+                    model="h4_prop_battle_lights_floorblue",
+                    reflection_axis={ x=true, y=false, z=false },
+                    flash_start_on=true,
+                }
+            },
+            {
+                name="Alternating Pair of Recessed Lights",
+                model="h4_prop_battle_lights_floorred",
+                offset={ x=0.3, y=0, z=1 },
+                flash_start_on=true,
+                flash_model="h4_prop_battle_lights_floorblue",
+                reflection={
+                    model="h4_prop_battle_lights_floorred",
+                    reflection_axis={ x=true, y=false, z=false },
+                    flash_start_on=false,
+                    flash_model="h4_prop_battle_lights_floorblue",
+                }
+            }
         },
     },
     {
@@ -461,31 +524,6 @@ local available_attachments = {
             },
         },
     },
-    -- Flashing is still kinda wonky for networking
-    --{
-    --    name="Pair of Flashing Recessed Lights",
-    --    model="h4_prop_battle_lights_floorred",
-    --    offset={ x=0.3, y=0, z=1 },
-    --    flash_start_on=false,
-    --    reflection={
-    --        model="h4_prop_battle_lights_floorblue",
-    --        reflection_axis={ x=true, y=false, z=false },
-    --        flash_start_on=true,
-    --    }
-    --},
-    --{
-    --    name="Pair of Alternating Recessed Lights",
-    --    model="h4_prop_battle_lights_floorred",
-    --    offset={ x=0.3, y=0, z=1 },
-    --    flash_start_on=true,
-    --    flash_model="h4_prop_battle_lights_floorblue",
-    --    reflection={
-    --        model="h4_prop_battle_lights_floorred",
-    --        reflection_axis={ x=true, y=false, z=false },
-    --        flash_start_on=true,
-    --        flash_model="h4_prop_battle_lights_floorblue",
-    --    }
-    --}
 }
 
 local function load_hash(hash)
@@ -505,7 +543,7 @@ local function attach_entity_to_entity(args)
         ENTITY.SET_ENTITY_ROTATION(args.handle, args.rotation.x or 0, args.rotation.y or 0, args.rotation.z or 0)
     else
         ENTITY.ATTACH_ENTITY_TO_ENTITY(
-            args.handle, args.force_parent or args.parent or args.root, args.bone_index or 0,
+            args.handle, args.parent or args.root, args.bone_index or 0,
             args.offset.x or 0, args.offset.y or 0, args.offset.z or 0,
             args.rotation.x or 0, args.rotation.y or 0, args.rotation.z or 0,
             false, true, false, false, 2, true
@@ -656,9 +694,9 @@ local function attach_invis_police_sirens(vehicle)
     local attachment = attach{
         root=vehicle,
         parent=vehicle,
-        name="Siren (Invisible Police Vehicle)",
+        name=config.siren_attachment.name,
         attachments=attachments,
-        model=config.siren_model,
+        model=config.siren_attachment.model,
         type="vehicle",
         is_visible=false
     }
@@ -704,10 +742,12 @@ local function activate_lights(vehicle)
     AUDIO._TRIGGER_SIREN(vehicle, true)
     AUDIO._SET_SIREN_KEEP_ON(vehicle, true)
     for _, attachment in pairs(attachments) do
-        VEHICLE.SET_VEHICLE_SIREN(attachment.handle, true)
-        ENTITY.SET_ENTITY_LIGHTS(attachment.handle, false)
-        AUDIO._TRIGGER_SIREN(attachment.handle, true)
-        AUDIO._SET_SIREN_KEEP_ON(attachment.handle, true)
+        if not attachment.is_light_disabled then
+            VEHICLE.SET_VEHICLE_SIREN(attachment.handle, true)
+            ENTITY.SET_ENTITY_LIGHTS(attachment.handle, false)
+            AUDIO._TRIGGER_SIREN(attachment.handle, true)
+            AUDIO._SET_SIREN_KEEP_ON(attachment.handle, true)
+        end
     end
 end
 
@@ -1117,6 +1157,7 @@ for _, category in pairs(available_attachments) do
             attachment_counter = 0
             attachment_name = nil
             attach_available_attachment_to_vehicle(policified_vehicle, available_attachment, attachments)
+            refresh_siren_light_status()
             menu.focus(rebuild_edit_attachments_menu())
         end)
     end
@@ -1239,7 +1280,10 @@ local siren_types = {
 
 menu.list_select(options_menu, "Invis Siren Type", {}, "Different siren types have slightly different sounds", siren_types, 1, function(index, name)
     local siren_type = siren_types[index]
-    config.siren_model = siren_type[4]
+    config.siren_attachment = {
+        name=siren_type[1],
+        model=siren_type[4]
+    }
     if policified_vehicle ~= nil then
         refresh_invis_police_sirens(policified_vehicle)
         refresh_siren_light_status(policified_vehicle)
