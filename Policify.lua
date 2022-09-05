@@ -1,7 +1,9 @@
--- Policify 2.1
+-- Policify
 -- by Hexarobi
 -- Enable Policify option to modify current vehicle, disable option to remove modifications
--- Modifies horn, paint, neon, and headlights. Flashes headlights and neon between red and blue.
+-- Modifies horn, paint, ne[on, and headlights. Flashes headlights and neon between red and blue.
+
+local SCRIPT_VERSION = "2.3"
 
 util.require_natives(1660775568)
 
@@ -256,6 +258,12 @@ local function restore_horn(vehicle)
 end
 
 local attachments = {}
+local attached_invis_police_sirens = {}
+
+local config = {
+    plate_text = "FIB",
+    siren_model = "police"
+}
 
 -- Good props for cop lights
 -- prop_air_lights_02a blue
@@ -269,153 +277,189 @@ local attachments = {}
 
 local available_attachments = {
     {
-        name="Red Spinning Light",
-        model="hei_prop_wall_light_10a_cr",
-        children={
+        name="Lights",
+        objects={
             {
-                model="prop_wall_light_10a",
-                offset={ x=0, y=0, z=0.75 },
-                rotation={ x=180, y=0, z=180 },
-                bone_index=1,
-            },
-        },
-    },
-    {
-        name="Blue Spinning Light",
-        model="hei_prop_wall_light_10a_cr",
-        children={
-            {
-                model="prop_wall_light_10b",
-                offset={ x=0, y=0, z=0.75 },
-                rotation={x=180, y=0, z=180},
-                bone_index=1,
-            },
-        },
-    },
-    {
-        name="Pair of Spinning Lights",
-        model="hei_prop_wall_light_10a_cr",
-        offset={ x=0.3, y=0, z=0 },
-        children = {
-            {
-                model="prop_wall_light_10b",
-                offset={ x=0, y=0, z=0.75 },
-                rotation={ x=180, y=0, z=180 },
-                bone_index=1,
-            },
-        },
-        reflection={
-            model="hei_prop_wall_light_10a_cr",
-            reflection_axis={ x=true, y=false, z=false },
-            children = {
-                {
-                    model="prop_wall_light_10a",
-                    offset={ x=0, y=0, z=0.75 },
-                    rotation={ x=180, y=0, z=0 },
-                    bone_index=1,
+                name = "Red Spinning Light",
+                model = "hei_prop_wall_alarm_on",
+                rotation = { x = 90, y = 0, z = 0 },
+                offset = { x = 0, y = 0, z = 0.5 },
+                children = {
+                    {
+                        model = "prop_wall_light_10a",
+                        offset = { x = 0, y = 0, z = 0.1 },
+                        rotation = { x = 0, y = 0, z = 180 },
+                        bone_index = 1,
+                    },
                 },
             },
-        }
+            {
+                name = "Blue Spinning Light",
+                model = "hei_prop_wall_alarm_on",
+                children = {
+                    {
+                        model = "prop_wall_light_10b",
+                        offset = { x = 0, y = 0, z = 0.1 },
+                        rotation = { x = 180, y = 0, z = 180 },
+                        bone_index = 1,
+                    },
+                },
+            },
+            {
+                name = "Pair of Spinning Lights",
+                model = "hei_prop_wall_light_10a_cr",
+                offset = { x = 0.3, y = 0, z = 0 },
+                children = {
+                    {
+                        model = "prop_wall_light_10b",
+                        offset = { x = 0, y = 0, z = 0.75 },
+                        rotation = { x = 180, y = 0, z = 180 },
+                        bone_index = 1,
+                    },
+                },
+                reflection = {
+                    model = "hei_prop_wall_light_10a_cr",
+                    reflection_axis = { x = true, y = false, z = false },
+                    children = {
+                        {
+                            model = "prop_wall_light_10a",
+                            offset = { x = 0, y = 0, z = 0.75 },
+                            rotation = { x = 180, y = 0, z = 0 },
+                            bone_index = 1,
+                        },
+                    },
+                }
+            },
+            {
+                name = "Short Light",
+                model = "hei_prop_wall_alarm_on",
+                offset = { x = 0, y = 0, z = 1 },
+                rotation = { x = -90, y = 0, z = 0 },
+            },
+
+            {
+                name = "Blue Recessed Light",
+                model = "h4_prop_battle_lights_floorblue",
+                offset = { x = 0, y = 0, z = 0.75 },
+            },
+            {
+                name = "Red Recessed Light",
+                model = "h4_prop_battle_lights_floorred",
+                offset = { x = 0, y = 0, z = 0.75 },
+            },
+            {
+                name = "Pair of Recessed Lights",
+                model = "h4_prop_battle_lights_floorred",
+                offset = { x = 0.3, y = 0, z = 1 },
+                reflection = {
+                    model = "h4_prop_battle_lights_floorblue",
+                    reflection_axis = { x = true, y = false, z = false },
+                }
+            },
+        },
     },
     {
-        name="Blue Recessed Light",
-        model="h4_prop_battle_lights_floorblue",
-        offset={ x=0, y=0, z=0.75 },
+        name="Props",
+        objects = {
+            {
+                name = "Riot Shield",
+                model = "prop_riot_shield",
+                offset = { x = 0, y = 0, z = 0 },
+                rotation = { x = 180, y = 180, z = 0 },
+            },
+            {
+                name = "Ballistic Shield",
+                model = "prop_ballistic_shield",
+                offset = { x = 0, y = 0, z = 0 },
+                rotation = { x = 180, y = 180, z = 0 },
+            },
+            {
+                name = "Minigun",
+                model = "prop_minigun_01",
+                offset = { x = 0, y = 0, z = 0 },
+                rotation = { x = 0, y = 0, z = 90 },
+            },
+        },
     },
     {
-        name="Red Recessed Light",
-        model="h4_prop_battle_lights_floorred",
-        offset={ x=0, y=0, z=0.75 },
-    },
-    {
-        name="Pair of Recessed Lights",
-        model="h4_prop_battle_lights_floorred",
-        offset={ x=0.3, y=0, z=1 },
-        reflection={
-            model="h4_prop_battle_lights_floorblue",
-            reflection_axis={ x=true, y=false, z=false },
-        }
-    },
-    {
-        name="Riot Shield",
-        model="prop_riot_shield",
-        offset={ x=0, y=0, z=0 },
-        rotation={ x=180, y=180, z=0 },
-    },
-    {
-        name="Police Cruiser",
-        type="vehicle",
-        model="police",
-    },
-    {
-        name="Police Buffalo",
-        type="vehicle",
-        model="police2",
-    },
-    {
-        name="Police Sports",
-        type="vehicle",
-        model="police3",
-    },
-    {
-        name="Police Van",
-        type="vehicle",
-        model="policet",
-    },
-    {
-        name="Police Bike",
-        type="vehicle",
-        model="policeb",
-    },
-    {
-        name="FIB Cruiser",
-        type="vehicle",
-        model="fbi",
-    },
-    {
-        name="FIB SUV",
-        type="vehicle",
-        model="fbi2",
-    },
-    {
-        name="Sheriff Cruiser",
-        type="vehicle",
-        model="sheriff",
-    },
-    {
-        name="Sheriff SUV",
-        type="vehicle",
-        model="sheriff2",
-    },
-    {
-        name="Unmarked Cruiser",
-        type="vehicle",
-        model="police3",
-    },
-    {
-        name="Snowy Rancher",
-        type="vehicle",
-        model="policeold1",
-    },
-    {
-        name="Snowy Cruiser",
-        type="vehicle",
-        model="policeold2",
-    },
-    {
-        name="Park Ranger",
-        type="vehicle",
-        model="pranger",
-    },
-    {
-        name="Riot Van",
-        type="vehicle",
-        model="rior",
-    },
-    {
-        name="Riot Control Vehicle (RCV)",
-        type="vehicle",
-        model="riot2",
+        name="Vehicles",
+        objects={
+            {
+                name = "Police Cruiser",
+                type = "vehicle",
+                model = "police",
+            },
+            {
+                name = "Police Buffalo",
+                type = "vehicle",
+                model = "police2",
+            },
+            {
+                name = "Police Sports",
+                type = "vehicle",
+                model = "police3",
+            },
+            {
+                name = "Police Van",
+                type = "vehicle",
+                model = "policet",
+            },
+            {
+                name = "Police Bike",
+                type = "vehicle",
+                model = "policeb",
+            },
+            {
+                name = "FIB Cruiser",
+                type = "vehicle",
+                model = "fbi",
+            },
+            {
+                name = "FIB SUV",
+                type = "vehicle",
+                model = "fbi2",
+            },
+            {
+                name = "Sheriff Cruiser",
+                type = "vehicle",
+                model = "sheriff",
+            },
+            {
+                name = "Sheriff SUV",
+                type = "vehicle",
+                model = "sheriff2",
+            },
+            {
+                name = "Unmarked Cruiser",
+                type = "vehicle",
+                model = "police3",
+            },
+            {
+                name = "Snowy Rancher",
+                type = "vehicle",
+                model = "policeold1",
+            },
+            {
+                name = "Snowy Cruiser",
+                type = "vehicle",
+                model = "policeold2",
+            },
+            {
+                name = "Park Ranger",
+                type = "vehicle",
+                model = "pranger",
+            },
+            {
+                name = "Riot Van",
+                type = "vehicle",
+                model = "rior",
+            },
+            {
+                name = "Riot Control Vehicle (RCV)",
+                type = "vehicle",
+                model = "riot2",
+            },
+        },
     },
     -- Flashing is still kinda wonky for networking
     --{
@@ -454,6 +498,7 @@ end
 local function attach_entity_to_entity(args)
     if args.offset == nil or args.rotation == nil then
         util.toast("Error: Position or Rotation not set")
+        util.log("[attach_entity_to_entity] Error: Position or Rotation not set. " .. debug.traceback())
         return
     end
     if args.parent == args.handle then
@@ -521,6 +566,7 @@ local function get_reflection_with_offsets(attachment)
     local reflection = attachment.reflection
     reflection.parent = attachment.handle
     reflection.offset = {x=0, y=0, z=0}
+    reflection.rotation = {x=0, y=0, z=0}
     if reflection.reflection_axis.x then
         reflection.offset.x = attachment.offset.x * -2
     end
@@ -606,16 +652,17 @@ local function attach_available_attachment_to_vehicle(root_vehicle, available_at
     return attachment
 end
 
-local function set_additional_vehicles(vehicle)
+local function attach_invis_police_sirens(vehicle)
     local attachment = attach{
         root=vehicle,
         parent=vehicle,
-        name="Siren (Invisible Police Bike)",
+        name="Siren (Invisible Police Vehicle)",
         attachments=attachments,
-        model="policeb",
+        model=config.siren_model,
         type="vehicle",
         is_visible=false
     }
+    table.insert(attached_invis_police_sirens, attachment.handle)
 
     local ped_hash = util.joaat("s_m_m_pilot_01")
     load_hash(ped_hash)
@@ -623,52 +670,85 @@ local function set_additional_vehicles(vehicle)
     local pilot = entities.create_ped(1, ped_hash, pos, 0.0)
     PED.SET_PED_INTO_VEHICLE(pilot, attachment.handle, -1)
     ENTITY.SET_ENTITY_VISIBLE(pilot, false, 0)
-
+    table.insert(attached_invis_police_sirens, pilot)
 end
 
-local function set_additional_lights()
-    -- Nothing
+local function remove_invis_police_sirens(vehicle)
+    for _, handle in pairs(attached_invis_police_sirens) do
+        entities.delete_by_handle(handle)
+    end
+    attached_invis_police_sirens = {}
 end
 
-local function restore_additional_lights()
+local function refresh_invis_police_sirens(vehicle)
+    remove_invis_police_sirens(vehicle)
+    attach_invis_police_sirens(vehicle)
+end
+
+local function remove_all_attachments(vehicle)
     for _, attachment in pairs(attachments) do
-        if attachment.type ~= "vehicle" then
-            detach(attachment)
+        if attachment.spawned_children then
+            for _, child in pairs(attachment.spawned_children) do
+                entities.delete_by_handle(child.handle)
+            end
+        end
+        entities.delete_by_handle(attachment.handle)
+    end
+    attachments = {}
+end
+
+local function activate_lights(vehicle)
+    VEHICLE.SET_VEHICLE_SIREN(vehicle, true)
+    VEHICLE.SET_VEHICLE_HAS_MUTED_SIRENS(vehicle, true)
+    ENTITY.SET_ENTITY_LIGHTS(vehicle, false)
+    AUDIO._TRIGGER_SIREN(vehicle, true)
+    AUDIO._SET_SIREN_KEEP_ON(vehicle, true)
+    for _, attachment in pairs(attachments) do
+        VEHICLE.SET_VEHICLE_SIREN(attachment.handle, true)
+        ENTITY.SET_ENTITY_LIGHTS(attachment.handle, false)
+        AUDIO._TRIGGER_SIREN(attachment.handle, true)
+        AUDIO._SET_SIREN_KEEP_ON(attachment.handle, true)
+    end
+end
+
+local function deactivate_lights(vehicle)
+    ENTITY.SET_ENTITY_LIGHTS(vehicle, true)
+    AUDIO._SET_SIREN_KEEP_ON(vehicle, false)
+    VEHICLE.SET_VEHICLE_SIREN(vehicle, false)
+    for _, attachment in pairs(attachments) do
+        ENTITY.SET_ENTITY_LIGHTS(attachment.handle, true)
+        VEHICLE.SET_VEHICLE_SIREN(attachment.handle, false)
+    end
+end
+
+local function activate_vehicle_sirens(vehicle)
+    --AUDIO.SET_SIREN_WITH_NO_DRIVER(vehicle, true)
+    VEHICLE.SET_VEHICLE_HAS_MUTED_SIRENS(vehicle, false)
+    VEHICLE.SET_VEHICLE_SIREN(vehicle, true)
+    AUDIO._TRIGGER_SIREN(vehicle, true)
+    AUDIO._SET_SIREN_KEEP_ON(vehicle, true)
+end
+
+local function deactivate_vehicle_sirens(vehicle)
+    --AUDIO._SET_SIREN_KEEP_ON(vehicle, false)
+    VEHICLE.SET_VEHICLE_HAS_MUTED_SIRENS(vehicle, true)
+    --VEHICLE.SET_VEHICLE_SIREN(vehicle, false)
+end
+
+local function activate_sirens(vehicle)
+    activate_vehicle_sirens(vehicle)
+    for _, attachment in pairs(attachments) do
+        if ENTITY.IS_ENTITY_A_VEHICLE(attachment.handle) then
+            activate_vehicle_sirens(attachment.handle)
         end
     end
 end
 
-local function activate_sirens()
+local function deactivate_sirens(vehicle)
+    deactivate_vehicle_sirens(vehicle)
     for _, attachment in pairs(attachments) do
-        if attachment.type == "vehicle" then
-
-            AUDIO.SET_SIREN_WITH_NO_DRIVER(attachment.handle, true)
-            VEHICLE.SET_VEHICLE_HAS_MUTED_SIRENS(attachment.handle, false)
-            VEHICLE.SET_VEHICLE_SIREN(attachment.handle, true)
-            AUDIO._TRIGGER_SIREN(attachment.handle, true)
-            AUDIO._SET_SIREN_KEEP_ON(attachment.handle, true)
-
-            --util.yield(2000)
-            --PED.KNOCK_PED_OFF_VEHICLE(pilot)
-            --util.yield(3000)
-            --entities.delete_by_handle(pilot)
-        end
-    end
-end
-
-local function deactivate_sirens()
-    for _, attachment in pairs(attachments) do
-        if attachment.type == "vehicle" then
-            AUDIO._SET_SIREN_KEEP_ON(attachment.handle, false)
-            VEHICLE.SET_VEHICLE_SIREN(attachment.handle, false)
-        end
-    end
-end
-
-local function restore_additional_vehicles()
-    for _, attachment in pairs(attachments) do
-        if attachment.type == "vehicle" then
-            detach(attachment)
+        if ENTITY.IS_ENTITY_A_VEHICLE(attachment.handle) then
+            deactivate_vehicle_sirens(attachment.handle)
         end
     end
 end
@@ -684,7 +764,7 @@ local function set_plate(vehicle)
     -- Set Exempt plate
     ENTITY.SET_ENTITY_AS_MISSION_ENTITY(vehicle, true, true)
     VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT_INDEX(vehicle, 4)
-    VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT(vehicle, "FIB")
+    VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT(vehicle, config.plate_text)
 end
 
 local function restore_plate(vehicle)
@@ -701,10 +781,31 @@ local override_headlights = true
 local override_neon = true
 local override_plate = true
 local override_horn = true
-local allow_additional_vehicles = true
-local allow_additional_lights = true
+local attach_invis_police_siren = true
 local is_active_sirens = false
 local is_active_lights = false
+local siren_setting = 1
+
+local function refresh_siren_light_status(vehicle)
+    if is_active_lights then
+        activate_lights(vehicle)
+    else
+        deactivate_lights(vehicle)
+    end
+    if is_active_sirens then
+        activate_sirens(vehicle)
+    else
+        deactivate_sirens(vehicle)
+    end
+end
+
+local function refresh_plate_text(vehicle)
+    if override_plate then
+        set_plate(vehicle)
+    else
+        restore_plate(vehicle)
+    end
+end
 
 local function add_overrides_to_vehicle(vehicle)
     if override_headlights then
@@ -732,14 +833,11 @@ local function add_overrides_to_vehicle(vehicle)
         set_plate(vehicle)
     end
 
-    if allow_additional_vehicles then
-        set_additional_vehicles(vehicle)
+    if attach_invis_police_siren then
+        attach_invis_police_sirens(vehicle)
     end
 
-    if allow_additional_lights then
-        set_additional_lights(vehicle)
-    end
-
+    --AUDIO.USE_SIREN_AS_HORN(vehicle, true)
 end
 
 local function remove_overrides_from_vehicle(vehicle)
@@ -758,12 +856,10 @@ local function remove_overrides_from_vehicle(vehicle)
     if override_plate then
         restore_plate(vehicle)
     end
-    if allow_additional_vehicles then
-        restore_additional_vehicles(vehicle)
+    if attach_invis_police_siren then
+        remove_invis_police_sirens(vehicle)
     end
-    if allow_additional_lights then
-        restore_additional_lights(vehicle)
-    end
+    remove_all_attachments(vehicle)
 end
 
 local function policify_tick_ying()
@@ -815,6 +911,7 @@ end
 local function policify_vehicle(vehicle)
     policified_vehicle = vehicle
     add_overrides_to_vehicle(vehicle)
+    refresh_siren_light_status(vehicle)
 
     policify_tick_counter = 0
     util.create_tick_handler(function()
@@ -840,10 +937,64 @@ local function policify_current_vehicle()
     end
 end
 
+local edit_attachments_menu
+
+local function rebuild_edit_attachments_menu()
+    local new_attachment_menus = {}
+    for _, attachment in pairs(attachments) do
+        if not attachment.is_added_to_edit_menu then
+            local edit_menu = menu.list(edit_attachments_menu, attachment.name or "unknow")
+            menu.divider(edit_menu, "Position")
+            local focus = menu.slider_float(edit_menu, "X: Left / Right", {}, "", -500000, 500000, math.floor(attachment.offset.x * 100), 1, function(value)
+                attachment.offset.x = value / 100
+                move_attachment(attachment)
+            end)
+            menu.slider_float(edit_menu, "Y: Forward / Back", {}, "", -500000, 500000, math.floor(attachment.offset.y * -100), 1, function(value)
+                attachment.offset.y = value / -100
+                move_attachment(attachment)
+            end)
+            menu.slider_float(edit_menu, "Z: Up / Down", {}, "", -500000, 500000, math.floor(attachment.offset.z * -100), 1, function(value)
+                attachment.offset.z = value / -100
+                move_attachment(attachment)
+            end)
+            menu.divider(edit_menu, "Rotation")
+            menu.slider(edit_menu, "X: Pitch", {}, "", -175, 180, math.floor(attachment.rotation.x), 5, function(value)
+                attachment.rotation.x = value
+                move_attachment(attachment)
+            end)
+            menu.slider(edit_menu, "Y: Roll", {}, "", -175, 180, math.floor(attachment.rotation.y), 5, function(value)
+                attachment.rotation.y = value
+                move_attachment(attachment)
+            end)
+            menu.slider(edit_menu, "Z: Yaw", {}, "", -175, 180, math.floor(attachment.rotation.z), 5, function(value)
+                attachment.rotation.z = value
+                move_attachment(attachment)
+            end)
+            menu.divider(edit_menu, "Options")
+            --menu.toggle(edit_menu, "Visible", {}, "", function(on)
+            --    attachment.is_visible = on
+            --    attach_entity_to_entity(attachment)
+            --end, attachment.is_visible)
+            menu.action(edit_menu, "Delete", {}, "", function()
+                detach(attachment)
+                menu.delete(edit_menu)
+                rebuild_edit_attachments_menu()
+            end)
+            attachment.is_added_to_edit_menu = true
+            table.insert(new_attachment_menus, focus)
+        end
+    end
+    return new_attachment_menus[1]
+end
+
+---
+--- Menu Options
+---
 
 menu.toggle(menu.my_root(), "Policify Vehicle", {"policify"}, "Enable Policify options on current vehicle", function(on)
     if on then
         policify_current_vehicle()
+        rebuild_edit_attachments_menu()
     else
         depolicify_vehicle()
     end
@@ -929,8 +1080,17 @@ end)
 --
 --end)
 
-menu.toggle(menu.my_root(), "Toggle Lights", {"coplights"}, "Toggle vehicle lights", function(on)
-    is_active_lights = on
+menu.list_select(menu.my_root(), "Sirens", {}, "", {"Off", "Lights Only", "Sirens and Lights"}, 1, function(key)
+    if key == 1 then
+        is_active_lights = false
+        is_active_sirens = false
+    elseif key == 2 then
+        is_active_lights = true
+        is_active_sirens = false
+    elseif key == 3 then
+        is_active_lights = true
+        is_active_sirens = true
+    end
     if is_active_lights then
         save_headlights(policified_vehicle)
         save_neon(policified_vehicle)
@@ -938,20 +1098,7 @@ menu.toggle(menu.my_root(), "Toggle Lights", {"coplights"}, "Toggle vehicle ligh
         restore_headlights(policified_vehicle)
         restore_neon(policified_vehicle)
     end
-end)
-
-menu.toggle(menu.my_root(), "Toggle Sirens", {"copsirens"}, "Toggle vehicle sirens", function(on)
-    for _, attachment in pairs(attachments) do
-        if attachment.type == "vehicle" then
-            is_active_sirens = on
-            if is_active_sirens then
-                activate_sirens()
-            else
-                deactivate_sirens()
-            end
-            return
-        end
-    end
+    refresh_siren_light_status(policified_vehicle)
 end)
 
 menu.action(menu.my_root(), "Call for Backup", {}, "Call for backup from nearby units", function(toggle)
@@ -961,60 +1108,18 @@ menu.action(menu.my_root(), "Call for Backup", {}, "Call for backup from nearby 
 end, true)
 
 local attach_additional_lights_menu = menu.list(menu.my_root(), "Add Attachment")
-local edit_attachments_menu = menu.list(menu.my_root(), "Edit Attachments")
+edit_attachments_menu = menu.list(menu.my_root(), "Edit Attachments")
 
-local function rebuild_edit_attachments_menu()
-    for _, attachment in pairs(attachments) do
-        if not attachment.is_added_to_edit_menu then
-            local edit_menu = menu.list(edit_attachments_menu, attachment.name or "unknow")
-            menu.divider(edit_menu, "Position")
-            menu.slider_float(edit_menu, "X: Left / Right", {}, "", -500000, 500000, math.floor(attachment.offset.x * 100), 1, function(value)
-                attachment.offset.x = value / 100
-                move_attachment(attachment)
-            end)
-            menu.slider_float(edit_menu, "Y: Forward / Back", {}, "", -500000, 500000, math.floor(attachment.offset.y * -100), 1, function(value)
-                attachment.offset.y = value / -100
-                move_attachment(attachment)
-            end)
-            menu.slider_float(edit_menu, "Z: Up / Down", {}, "", -500000, 500000, math.floor(attachment.offset.z * -100), 1, function(value)
-                attachment.offset.z = value / -100
-                move_attachment(attachment)
-            end)
-            menu.divider(edit_menu, "Rotation")
-            menu.slider(edit_menu, "X: Pitch", {}, "", -175, 180, math.floor(attachment.rotation.x), 5, function(value)
-                attachment.rotation.x = value
-                move_attachment(attachment)
-            end)
-            menu.slider(edit_menu, "Y: Roll", {}, "", -175, 180, math.floor(attachment.rotation.y), 5, function(value)
-                attachment.rotation.y = value
-                move_attachment(attachment)
-            end)
-            menu.slider(edit_menu, "Z: Yaw", {}, "", -175, 180, math.floor(attachment.rotation.z), 5, function(value)
-                attachment.rotation.z = value
-                move_attachment(attachment)
-            end)
-            menu.divider(edit_menu, "Options")
-            --menu.toggle(edit_menu, "Visible", {}, "", function(on)
-            --    attachment.is_visible = on
-            --    attach_entity_to_entity(attachment)
-            --end, attachment.is_visible)
-            menu.action(edit_menu, "Delete", {}, "", function()
-                detach(attachment)
-                menu.delete(edit_menu)
-                rebuild_edit_attachments_menu()
-            end)
-            attachment.is_added_to_edit_menu = true
-        end
+for _, category in pairs(available_attachments) do
+    local category_menu = menu.list(attach_additional_lights_menu, category.name)
+    for _, available_attachment in pairs(category.objects) do
+        menu.action(category_menu, available_attachment.name, {}, "", function()
+            attachment_counter = 0
+            attachment_name = nil
+            attach_available_attachment_to_vehicle(policified_vehicle, available_attachment, attachments)
+            menu.focus(rebuild_edit_attachments_menu())
+        end)
     end
-end
-
-for _, available_attachment in pairs(available_attachments) do
-    menu.action(attach_additional_lights_menu, available_attachment.name, {}, "", function()
-        attachment_counter = 0
-        attachment_name = nil
-        attach_available_attachment_to_vehicle(policified_vehicle, available_attachment, attachments)
-        rebuild_edit_attachments_menu()
-    end)
 end
 
 local options_menu = menu.list(menu.my_root(), "Options")
@@ -1083,49 +1188,83 @@ menu.toggle(options_menu, "Override Horn", {}, "If enabled, will override vehicl
     end
 end, true)
 
-menu.toggle(options_menu, "Override Plate", {}, "If enabled, will override vehicle plate with FIB Exempt plate", function(toggle)
-    if toggle then
-        override_plate = true
-        if policify_tick_counter ~= nil then
-            save_plate(policified_vehicle)
-            set_plate(policified_vehicle)
-        end
-    else
-        override_plate = false
-        if policify_tick_counter ~= nil then
-            restore_plate(policified_vehicle)
-        end
-    end
-end, true)
-
-menu.toggle(options_menu, "Enable Siren Sounds", {}, "If enabled, will spawn an invisible police bike to play its siren", function(toggle)
-    if toggle then
-        allow_additional_vehicles = true
-        if policify_tick_counter ~= nil then
-            set_additional_vehicles(policified_vehicle)
-        end
-    else
-        allow_additional_vehicles = false
-        if policify_tick_counter ~= nil then
-            restore_additional_vehicles(policified_vehicle)
-        end
-    end
-end, true)
-
-menu.toggle(options_menu, "Enable Attached Lights", {}, "If enabled, will show attached additional lights", function(toggle)
-    allow_additional_lights = toggle
+menu.toggle(options_menu, "Override Plate", {}, "If enabled, will override vehicle plate with custom exempt plate", function(toggle)
+    override_plate = toggle
     if policify_tick_counter ~= nil then
-        if toggle then
-            set_additional_lights(policified_vehicle)
+        if override_plate then
+            save_plate(policified_vehicle)
+        end
+        refresh_plate_text(policified_vehicle)
+    end
+end, true)
+
+menu.text_input(options_menu, "Set Plate Text", {"setpoliceplatetext"}, "Set the text for the exempt police plates", function(value)
+    config.plate_text = value
+    refresh_plate_text(policified_vehicle)
+end, config.plate_text)
+
+menu.toggle(options_menu, "Enable Invis Siren", {}, "If enabled, will attach an invisible emergency vehicle to give any vehicle sirens.", function(toggle)
+    attach_invis_police_siren = toggle
+    if policify_tick_counter ~= nil then
+        if attach_invis_police_siren then
+            attach_invis_police_sirens(policified_vehicle)
+            refresh_siren_light_status(policified_vehicle)
+            rebuild_edit_attachments_menu()
         else
-            restore_additional_lights(policified_vehicle)
+            remove_invis_police_sirens(policified_vehicle)
         end
     end
 end, true)
 
-menu.toggle(options_menu, "View Nearby Units", {}, "If enabled, will show nearby police units on minimap", function(toggle)
-    PLAYER.SET_POLICE_RADAR_BLIPS(toggle)
-end, true)
+local siren_types = {
+    {
+        "Police Cruiser",
+        {},
+        "A slow wail",
+        "police",
+    },
+    {
+        "Police Bike",
+        {},
+        "A fast chirp",
+        "policeb",
+    },
+    {
+        "Ambulance",
+        {},
+        "A slightly different wail",
+        "ambulance",
+    },
+}
+
+menu.list_select(options_menu, "Invis Siren Type", {}, "Different siren types have slightly different sounds", siren_types, 1, function(index, name)
+    local siren_type = siren_types[index]
+    config.siren_model = siren_type[4]
+    if policified_vehicle ~= nil then
+        refresh_invis_police_sirens(policified_vehicle)
+        refresh_siren_light_status(policified_vehicle)
+    end
+end)
+
+local script_meta_menu = menu.list(menu.my_root(), "Script Meta")
+
+menu.divider(script_meta_menu, "Policify")
+menu.readonly(script_meta_menu, "Version", SCRIPT_VERSION)
+
+local auto_update_host = "raw.githubusercontent.com"
+local auto_update_path = "/hexarobi/stand-lua-policify/main/Policify.lua"
+menu.action(script_meta_menu, "Auto Update", {}, "Attempt to auto-update to latest version", function()
+    async_http.init(auto_update_host, auto_update_path, function(result)
+        local file = io.open(filesystem.scripts_dir()  .. SCRIPT_RELPATH, "w")
+        if file == nil then
+            util.toast("Error opening script file for writing")
+        end
+        file:write(result:gsub("\r", "") .. "\n") -- have to strip out \r for some reason, or it makes two lines. ty windows
+        file:close()
+        util.toast("Script version refreshed. Restart to apply any updates.")
+    end, on_err)
+    async_http.dispatch()
+end)
 
 util.create_tick_handler(function()
     return true
