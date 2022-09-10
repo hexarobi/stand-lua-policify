@@ -3,7 +3,22 @@
 -- Enable Policify option to modify current vehicle, disable option to remove modifications
 -- Modifies horn, paint, ne[on, and headlights. Flashes headlights and neon between red and blue.
 
-local SCRIPT_VERSION = "2.4"
+local SCRIPT_VERSION = "2.4.1"
+
+local auto_update_source_url = "https://raw.githubusercontent.com/hexarobi/stand-lua-policify/main/Policify.lua"
+local status, lib = pcall(require, "auto-updater")
+if not status then
+    async_http.init("raw.githubusercontent.com", "/hexarobi/stand-lua-auto-updater/main/auto-updater.lua",
+        function(result, headers, status_code) local error_prefix = "Error downloading auto-updater: "
+            if status_code ~= 200 then util.toast(error_prefix..status_code) return false end
+            if not result or result == "" then util.toast(error_prefix.."Found empty file.") return false end
+            local file = io.open(filesystem.scripts_dir() .. "lib\\auto-updater.lua", "wb")
+            if file == nil then util.toast(error_prefix.."Could not open file for writing.") return false end
+            file:write(result) file:close() util.toast("Successfully installed auto-updater lib")
+        end, function() util.toast("Error downloading auto-updater lib. Update failed to download.") end)
+    async_http.dispatch() util.yield(3000) require("auto-updater")
+end
+run_auto_update({source_url=auto_update_source_url, script_relpath=SCRIPT_RELPATH, verify_file_begins_with="--"})
 
 util.require_natives(1660775568)
 
@@ -1294,23 +1309,6 @@ local script_meta_menu = menu.list(menu.my_root(), "Script Meta")
 
 menu.divider(script_meta_menu, "Policify")
 menu.readonly(script_meta_menu, "Version", SCRIPT_VERSION)
-
-local auto_update_host = "raw.githubusercontent.com"
-local auto_update_path = "/hexarobi/stand-lua-policify/main/Policify.lua"
-menu.action(script_meta_menu, "Auto Update", {}, "Attempt to auto-update to latest version", function()
-    async_http.init(auto_update_host, auto_update_path, function(result)
-        local file = io.open(filesystem.scripts_dir()  .. SCRIPT_RELPATH, "w")
-        if file == nil then
-            util.toast("Error opening script file for writing")
-        end
-        file:write(result:gsub("\r", "") .. "\n") -- have to strip out \r for some reason, or it makes two lines. ty windows
-        file:close()
-        util.toast("Script version refreshed. Restart to apply any updates.")
-    end, function()
-        util.toast("Script update failed to download.")
-    end)
-    async_http.dispatch()
-end)
 
 util.create_tick_handler(function()
     return true
