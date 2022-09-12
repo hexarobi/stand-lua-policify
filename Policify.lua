@@ -3,7 +3,7 @@
 -- Enable Policify option to modify current vehicle, disable option to remove modifications
 -- Modifies horn, paint, ne[on, and headlights. Flashes headlights and neon between red and blue.
 
-local SCRIPT_VERSION = "3.0b2"
+local SCRIPT_VERSION = "3.0b3"
 local SELECTED_BRANCH = "dev"
 local AUTO_UPDATE_BRANCHES = {"main", "dev"}
 
@@ -22,9 +22,10 @@ if not status then
 end
 local function auto_update_branch(selected_branch)
     local branch_source_url = auto_update_source_url:gsub("/main/", "/"..selected_branch.."/")
-    util.toast("Installing "..branch_source_url)
+    util.toast("Installing "..branch_source_url, TOAST_ALL)
     run_auto_update({source_url=branch_source_url, script_relpath=SCRIPT_RELPATH, verify_file_begins_with="--"})
 end
+util.toast("Boot up auto-updating "..SELECTED_BRANCH, TOAST_ALL)
 auto_update_branch(SELECTED_BRANCH)
 
 local SIRENS_OFF = 1
@@ -2073,6 +2074,7 @@ local script_meta_menu = menu.list(menu.my_root(), "Script Meta")
 menu.divider(script_meta_menu, "Policify")
 menu.readonly(script_meta_menu, "Version", SCRIPT_VERSION)
 menu.list_select(script_meta_menu, "Branch", {}, "Switch from main to dev branch to get cutting edge updates, but also potentially more bugs.", AUTO_UPDATE_BRANCHES, 1, function(index)
+    util.toast("Menu auto-updating "..AUTO_UPDATE_BRANCHES[index], TOAST_ALL)
     auto_update_branch(AUTO_UPDATE_BRANCHES[index])
 end)
 menu.hyperlink(script_meta_menu, "Github Source", "https://github.com/hexarobi/stand-lua-policify", "View source files on Github")
@@ -2082,3 +2084,4 @@ util.create_tick_handler(function()
     policify_tick()
     return true
 end)
+
