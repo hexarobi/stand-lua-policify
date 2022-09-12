@@ -2090,9 +2090,9 @@ local release_branches = {
     },
 }
 
-menu.list_select(script_meta_menu, "Release Branch", {}, "Switch from main to dev to get cutting edge updates, but also potentially more bugs.", release_branches, 1, function(index)
-    util.toast("["..SCRIPT_VERSION.."]Menu auto-updating "..release_branches[index], TOAST_ALL)
-    auto_update_branch(release_branches[index])
+menu.list_select(script_meta_menu, "Release Branch", {}, "Switch from main to dev to get cutting edge updates, but also potentially more bugs.", release_branches, 1, function(index, branch_name)
+    util.toast("["..SCRIPT_VERSION.."]Menu auto-updating "..branch_name, TOAST_ALL)
+    auto_update_branch(branch_name)
 end)
 
 menu.hyperlink(script_meta_menu, "Github Source", "https://github.com/hexarobi/stand-lua-policify", "View source files on Github")
