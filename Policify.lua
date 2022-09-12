@@ -4,12 +4,12 @@
 -- Save and share your polcified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0b8"
+local SCRIPT_VERSION = "3.0b9"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
 }
-local SELECTED_BRANCH_INDEX = 1
+local SELECTED_BRANCH_INDEX = 2
 
 local auto_update_source_url = "https://raw.githubusercontent.com/hexarobi/stand-lua-policify/main/Policify.lua"
 local status, lib = pcall(require, "auto-updater")
@@ -2076,8 +2076,7 @@ local script_meta_menu = menu.list(menu.my_root(), "Script Meta")
 menu.divider(script_meta_menu, "Policify")
 menu.readonly(script_meta_menu, "Version", SCRIPT_VERSION)
 menu.list_select(script_meta_menu, "Release Branch", {}, "Switch from main to dev to get cutting edge updates, but also potentially more bugs.", AUTO_UPDATE_BRANCHES, SELECTED_BRANCH_INDEX, function(index, menu_name, previous_option, click_type)
-    if click_type ~= 0 then return end      
-    util.toast("["..SCRIPT_VERSION.."] Menu update "..AUTO_UPDATE_BRANCHES[index][1], TOAST_ALL)
+    if click_type ~= 0 then return end
     auto_update_branch(AUTO_UPDATE_BRANCHES[index][1])
 end)
 menu.hyperlink(script_meta_menu, "Github Source", "https://github.com/hexarobi/stand-lua-policify", "View source files on Github")
