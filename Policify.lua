@@ -5,7 +5,7 @@
 
 local SCRIPT_VERSION = "3.0b2"
 local SELECTED_BRANCH = "dev"
-local AUTO_UPDATE_BRANCHES = { "main", "dev"}
+local AUTO_UPDATE_BRANCHES = {"main", "dev"}
 
 local auto_update_source_url = "https://raw.githubusercontent.com/hexarobi/stand-lua-policify/main/Policify.lua"
 local status, lib = pcall(require, "auto-updater")
@@ -22,6 +22,7 @@ if not status then
 end
 local function auto_update_branch(selected_branch)
     local branch_source_url = auto_update_source_url:gsub("/main/", "/"..selected_branch.."/")
+    util.toast("Installing "..branch_source_url)
     run_auto_update({source_url=branch_source_url, script_relpath=SCRIPT_RELPATH, verify_file_begins_with="--"})
 end
 auto_update_branch(SELECTED_BRANCH)
