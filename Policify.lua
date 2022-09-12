@@ -3,9 +3,11 @@
 -- Enable Policify option to modify current vehicle, disable option to remove modifications
 -- Modifies horn, paint, ne[on, and headlights. Flashes headlights and neon between red and blue.
 
-local SCRIPT_VERSION = "3.0b1"
+local SCRIPT_VERSION = "3.0b2"
 
-local auto_update_source_url = "https://raw.githubusercontent.com/hexarobi/stand-lua-policify/dev/Policify.lua"
+local auto_update_source_url = "https://raw.githubusercontent.com/hexarobi/stand-lua-policify/main/Policify.lua"
+local auto_update_selected_branch = "main"
+local auto_update_branches = {"main", "dev"}
 local status, lib = pcall(require, "auto-updater")
 if not status then
     async_http.init("raw.githubusercontent.com", "/hexarobi/stand-lua-auto-updater/main/auto-updater.lua",
@@ -18,7 +20,11 @@ if not status then
             end, function() util.toast("Error downloading auto-updater lib. Update failed to download.") end)
     async_http.dispatch() util.yield(3000) require("auto-updater")
 end
-run_auto_update({source_url=auto_update_source_url, script_relpath=SCRIPT_RELPATH})
+local function auto_update_branch(selected_branch)
+    local new_source_url = auto_update_source_url:gsub("/main/", "/"..selected_branch.."/")
+    run_auto_update({source_url=new_source_url, script_relpath=SCRIPT_RELPATH, verify_file_begins_with="--"})
+end
+auto_update_branch(auto_update_selected_branch)
 
 local SIRENS_OFF = 1
 local SIRENS_LIGHTS_ONLY = 2
@@ -36,7 +42,8 @@ local config = {
     siren_attachment = {
         name = "Police Cruiser",
         model = "police",
-    }
+    },
+    source_code_branch = "main",
 }
 
 local VEHICLE_STORE_DIR = filesystem.store_dir() .. 'Policify\\vehicles\\'
@@ -2064,6 +2071,10 @@ local script_meta_menu = menu.list(menu.my_root(), "Script Meta")
 
 menu.divider(script_meta_menu, "Policify")
 menu.readonly(script_meta_menu, "Version", SCRIPT_VERSION)
+menu.list_select(script_meta_menu, "Branch", {}, "Switch from main to dev branch to get cutting edge updates but potentially more bugs", auto_update_branches, 1, function(index)
+    auto_update_selected_branch = auto_update_branches[index]
+    auto_update_branch(auto_update_selected_branch)
+end)
 menu.hyperlink(script_meta_menu, "Github Source", "https://github.com/hexarobi/stand-lua-policify", "View source files on Github")
 menu.hyperlink(script_meta_menu, "Vehicles Folder", "file:///"..filesystem.store_dir() .. 'Policify\\vehicles\\', "Open local Vehicles folder")
 
