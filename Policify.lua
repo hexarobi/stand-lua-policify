@@ -3,22 +3,31 @@
 -- Enable Policify option to modify current vehicle, disable option to remove modifications
 -- Modifies horn, paint, ne[on, and headlights. Flashes headlights and neon between red and blue.
 
-local SCRIPT_VERSION = "2.4.1"
+local SCRIPT_VERSION = "2.5"
+local AUTO_UPDATE_BRANCHES = {
+    { "main", {}, "More stable, but updated less often.", "main", },
+    { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
+}
+local SELECTED_BRANCH_INDEX = 1
 
 local auto_update_source_url = "https://raw.githubusercontent.com/hexarobi/stand-lua-policify/main/Policify.lua"
 local status, lib = pcall(require, "auto-updater")
 if not status then
     async_http.init("raw.githubusercontent.com", "/hexarobi/stand-lua-auto-updater/main/auto-updater.lua",
-        function(result, headers, status_code) local error_prefix = "Error downloading auto-updater: "
-            if status_code ~= 200 then util.toast(error_prefix..status_code) return false end
-            if not result or result == "" then util.toast(error_prefix.."Found empty file.") return false end
-            local file = io.open(filesystem.scripts_dir() .. "lib\\auto-updater.lua", "wb")
-            if file == nil then util.toast(error_prefix.."Could not open file for writing.") return false end
-            file:write(result) file:close() util.toast("Successfully installed auto-updater lib")
-        end, function() util.toast("Error downloading auto-updater lib. Update failed to download.") end)
+            function(result, headers, status_code) local error_prefix = "Error downloading auto-updater: "
+                if status_code ~= 200 then util.toast(error_prefix..status_code) return false end
+                if not result or result == "" then util.toast(error_prefix.."Found empty file.") return false end
+                local file = io.open(filesystem.scripts_dir() .. "lib\\auto-updater.lua", "wb")
+                if file == nil then util.toast(error_prefix.."Could not open file for writing.") return false end
+                file:write(result) file:close() util.toast("Successfully installed auto-updater lib")
+            end, function() util.toast("Error downloading auto-updater lib. Update failed to download.") end)
     async_http.dispatch() util.yield(3000) require("auto-updater")
 end
-run_auto_update({source_url=auto_update_source_url, script_relpath=SCRIPT_RELPATH, verify_file_begins_with="--"})
+local function auto_update_branch(selected_branch)
+    local branch_source_url = auto_update_source_url:gsub("/main/", "/"..selected_branch.."/")
+    run_auto_update({source_url=branch_source_url, script_relpath=SCRIPT_RELPATH, verify_file_begins_with="--"})
+end
+auto_update_branch(AUTO_UPDATE_BRANCHES[SELECTED_BRANCH_INDEX][1])
 
 util.require_natives(1660775568)
 
@@ -558,10 +567,10 @@ local function attach_entity_to_entity(args)
         ENTITY.SET_ENTITY_ROTATION(args.handle, args.rotation.x or 0, args.rotation.y or 0, args.rotation.z or 0)
     else
         ENTITY.ATTACH_ENTITY_TO_ENTITY(
-            args.handle, args.parent or args.root, args.bone_index or 0,
-            args.offset.x or 0, args.offset.y or 0, args.offset.z or 0,
-            args.rotation.x or 0, args.rotation.y or 0, args.rotation.z or 0,
-            false, true, false, false, 2, true
+                args.handle, args.parent or args.root, args.bone_index or 0,
+                args.offset.x or 0, args.offset.y or 0, args.offset.z or 0,
+                args.rotation.x or 0, args.rotation.y or 0, args.rotation.z or 0,
+                false, true, false, false, 2, true
         )
     end
 end
@@ -1309,6 +1318,11 @@ local script_meta_menu = menu.list(menu.my_root(), "Script Meta")
 
 menu.divider(script_meta_menu, "Policify")
 menu.readonly(script_meta_menu, "Version", SCRIPT_VERSION)
+menu.list_select(script_meta_menu, "Release Branch", {}, "Switch from main to dev to get cutting edge updates, but also potentially more bugs.", AUTO_UPDATE_BRANCHES, SELECTED_BRANCH_INDEX, function(index, menu_name, previous_option, click_type)
+    if click_type ~= 0 then return end
+    auto_update_branch(AUTO_UPDATE_BRANCHES[index][1])
+end)
+menu.hyperlink(script_meta_menu, "Github Source", "https://github.com/hexarobi/stand-lua-policify", "View source files on Github")
 
 util.create_tick_handler(function()
     return true
