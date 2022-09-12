@@ -1,7 +1,8 @@
 -- Policify
 -- by Hexarobi
--- Enable Policify option to modify current vehicle, disable option to remove modifications
--- Modifies horn, paint, ne[on, and headlights. Flashes headlights and neon between red and blue.
+-- Turns any vehicle into a police vehicle, with controlable flashing lights and sirens.
+-- Save and share your polcified vehicles.
+-- https://github.com/hexarobi/stand-lua-policify
 
 local SCRIPT_VERSION = "3.0b5"
 local SELECTED_BRANCH = "dev"
