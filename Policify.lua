@@ -4,7 +4,7 @@
 -- Save and share your polcified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0b5"
+local SCRIPT_VERSION = "3.0b6"
 local SELECTED_BRANCH = "dev"
 local AUTO_UPDATE_BRANCHES = {"main", "dev"}
 
