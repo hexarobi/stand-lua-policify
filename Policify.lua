@@ -4,9 +4,12 @@
 -- Save and share your polcified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0b6"
-local SELECTED_BRANCH = "dev"
-local AUTO_UPDATE_BRANCHES = {"main", "dev"}
+local SCRIPT_VERSION = "3.0b7"
+local AUTO_UPDATE_BRANCHES = {
+    { "main", {}, "More stable, but updated less often.", "main", },
+    { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
+}
+local SELECTED_BRANCH_INDEX = 1
 
 local auto_update_source_url = "https://raw.githubusercontent.com/hexarobi/stand-lua-policify/main/Policify.lua"
 local status, lib = pcall(require, "auto-updater")
@@ -23,11 +26,9 @@ if not status then
 end
 local function auto_update_branch(selected_branch)
     local branch_source_url = auto_update_source_url:gsub("/main/", "/"..selected_branch.."/")
-    util.toast("["..SCRIPT_VERSION.."]Installing "..branch_source_url, TOAST_ALL)
     run_auto_update({source_url=branch_source_url, script_relpath=SCRIPT_RELPATH, verify_file_begins_with="--"})
 end
-util.toast("["..SCRIPT_VERSION.."]Boot up auto-updating "..SELECTED_BRANCH, TOAST_ALL)
-auto_update_branch(SELECTED_BRANCH)
+auto_update_branch(AUTO_UPDATE_BRANCHES[SELECTED_BRANCH_INDEX][1])
 
 local SIRENS_OFF = 1
 local SIRENS_LIGHTS_ONLY = 2
@@ -743,7 +744,7 @@ local function save_neon(policified_vehicle)
         Back = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(policified_vehicle.handle, 3),
     }
     if (policified_vehicle.save_data.Lights.Neon.Left or policified_vehicle.save_data.Lights.Neon.Right
-        or policified_vehicle.save_data.Lights.Neon.Front or policified_vehicle.save_data.Lights.Neon.Back) then
+            or policified_vehicle.save_data.Lights.Neon.Front or policified_vehicle.save_data.Lights.Neon.Back) then
         local Color = {
             r = memory.alloc(4),
             g = memory.alloc(4),
@@ -777,10 +778,10 @@ local function restore_neon(policified_vehicle)
     VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(policified_vehicle.handle, 3, policified_vehicle.save_data.Lights.Neon.Back or false)
     if policified_vehicle.save_data.Lights.Neon.Color then
         VEHICLE._SET_VEHICLE_NEON_LIGHTS_COLOUR(
-            policified_vehicle.handle,
-            policified_vehicle.save_data.Lights.Neon.Color.r,
-            policified_vehicle.save_data.Lights.Neon.Color.g,
-            policified_vehicle.save_data.Lights.Neon.Color.b
+                policified_vehicle.handle,
+                policified_vehicle.save_data.Lights.Neon.Color.r,
+                policified_vehicle.save_data.Lights.Neon.Color.g,
+                policified_vehicle.save_data.Lights.Neon.Color.b
         )
     end
 end
@@ -1034,10 +1035,10 @@ local function update_attachment(attachment)
         ENTITY.SET_ENTITY_ROTATION(attachment.handle, attachment.rotation.x or 0, attachment.rotation.y or 0, attachment.rotation.z or 0)
     else
         ENTITY.ATTACH_ENTITY_TO_ENTITY(
-            attachment.handle, attachment.parent.handle, attachment.bone_index or 0,
-            attachment.offset.x or 0, attachment.offset.y or 0, attachment.offset.z or 0,
-            attachment.rotation.x or 0, attachment.rotation.y or 0, attachment.rotation.z or 0,
-            false, true, attachment.has_collision, false, 2, true
+                attachment.handle, attachment.parent.handle, attachment.bone_index or 0,
+                attachment.offset.x or 0, attachment.offset.y or 0, attachment.offset.z or 0,
+                attachment.rotation.x or 0, attachment.rotation.y or 0, attachment.rotation.z or 0,
+                false, true, attachment.has_collision, false, 2, true
         )
     end
 end
@@ -1424,10 +1425,10 @@ local function deserialize_vehicle_attributes(attachment)
     VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(attachment.handle, 3, serialized_vehicle.neon.back or false)
     if serialized_vehicle.neon_color then
         VEHICLE._SET_VEHICLE_NEON_LIGHTS_COLOUR(
-            attachment.handle,
-            serialized_vehicle.neon_color.r,
-            serialized_vehicle.neon_color.g,
-            serialized_vehicle.neon_color.b
+                attachment.handle,
+                serialized_vehicle.neon_color.r,
+                serialized_vehicle.neon_color.g,
+                serialized_vehicle.neon_color.b
         )
     end
 
@@ -1441,32 +1442,32 @@ local function deserialize_vehicle_attributes(attachment)
 
     if serialized_vehicle.paint.primary.is_custom then
         VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(
-            attachment.handle,
-            serialized_vehicle.paint.primary.custom_color.r,
-            serialized_vehicle.paint.primary.custom_color.g,
-            serialized_vehicle.paint.primary.custom_color.b
+                attachment.handle,
+                serialized_vehicle.paint.primary.custom_color.r,
+                serialized_vehicle.paint.primary.custom_color.g,
+                serialized_vehicle.paint.primary.custom_color.b
         )
     else
         VEHICLE.SET_VEHICLE_MOD_COLOR_1(
-            attachment.handle,
-            serialized_vehicle.paint.primary.paint_type,
-            serialized_vehicle.paint.primary.color,
-            serialized_vehicle.paint.primary.pearlescent_color
+                attachment.handle,
+                serialized_vehicle.paint.primary.paint_type,
+                serialized_vehicle.paint.primary.color,
+                serialized_vehicle.paint.primary.pearlescent_color
         )
     end
 
     if serialized_vehicle.paint.secondary.is_custom then
         VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(
-            attachment.handle,
-            serialized_vehicle.paint.secondary.custom_color.r,
-            serialized_vehicle.paint.secondary.custom_color.g,
-            serialized_vehicle.paint.secondary.custom_color.b
+                attachment.handle,
+                serialized_vehicle.paint.secondary.custom_color.r,
+                serialized_vehicle.paint.secondary.custom_color.g,
+                serialized_vehicle.paint.secondary.custom_color.b
         )
     else
         VEHICLE.SET_VEHICLE_MOD_COLOR_2(
-            attachment.handle,
-            serialized_vehicle.paint.secondary.paint_type,
-            serialized_vehicle.paint.secondary.color
+                attachment.handle,
+                serialized_vehicle.paint.secondary.paint_type,
+                serialized_vehicle.paint.secondary.color
         )
     end
 
@@ -1522,7 +1523,7 @@ local function spawn_vehicle_for_player(policified_vehicle, pid)
         policified_vehicle.hash = util.joaat(policified_vehicle.model)
     end
     if not (STREAMING.IS_MODEL_VALID(policified_vehicle.hash) and STREAMING.IS_MODEL_A_VEHICLE(policified_vehicle.hash)) then
-         util.toast("Cannot spawn vehicle model: "..policified_vehicle.model)
+        util.toast("Cannot spawn vehicle model: "..policified_vehicle.model)
     end
     load_hash(policified_vehicle.hash)
     local target_ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid)
@@ -1577,19 +1578,19 @@ local function rebuild_add_attachments_menu(attachment)
 
     menu.text_input(attachment.menus.add_attachment, "Object by Name", {"policifyattachobject"},
             "Add an in-game object by exact name. To search for objects try https://gtahash.ru/", function (value)
-        local new_attachment = {
-            root = attachment.root,
-            parent = attachment,
-            name = value,
-            model = value,
-        }
-        attach_attachment_with_children(new_attachment)
-        refresh_siren_light_status(new_attachment)
-        local newly_added_edit_menu = attachment.menus.rebuild_edit_attachments_menu(attachment)
-        if newly_added_edit_menu then
-            menu.focus(newly_added_edit_menu)
-        end
-    end)
+                local new_attachment = {
+                    root = attachment.root,
+                    parent = attachment,
+                    name = value,
+                    model = value,
+                }
+                attach_attachment_with_children(new_attachment)
+                refresh_siren_light_status(new_attachment)
+                local newly_added_edit_menu = attachment.menus.rebuild_edit_attachments_menu(attachment)
+                if newly_added_edit_menu then
+                    menu.focus(newly_added_edit_menu)
+                end
+            end)
 
     menu.text_input(attachment.menus.add_attachment, "Vehicle by Name", {"policifyattachvehicle"},
             "Add a vehicle by exact name.", function (value)
@@ -2074,27 +2075,10 @@ local script_meta_menu = menu.list(menu.my_root(), "Script Meta")
 
 menu.divider(script_meta_menu, "Policify")
 menu.readonly(script_meta_menu, "Version", SCRIPT_VERSION)
-
-local release_branches = {
-    {
-        "main",
-        {},
-        "More stable, but updated less often.",
-        "main",
-    },
-    {
-        "dev",
-        {},
-        "Cutting edge updates, but less stable.",
-        "dev",
-    },
-}
-
-menu.list_select(script_meta_menu, "Release Branch", {}, "Switch from main to dev to get cutting edge updates, but also potentially more bugs.", release_branches, 1, function(index, branch_name)
-    util.toast("["..SCRIPT_VERSION.."]Menu auto-updating "..branch_name, TOAST_ALL)
-    auto_update_branch(branch_name)
+menu.list_select(script_meta_menu, "Release Branch", {}, "Switch from main to dev to get cutting edge updates, but also potentially more bugs.", AUTO_UPDATE_BRANCHES, SELECTED_BRANCH_INDEX, function(index, menu_name, previous_option, click_type)
+    if click_type ~= 0 then return end
+    auto_update_branch(AUTO_UPDATE_BRANCHES[index][1])
 end)
-
 menu.hyperlink(script_meta_menu, "Github Source", "https://github.com/hexarobi/stand-lua-policify", "View source files on Github")
 menu.hyperlink(script_meta_menu, "Vehicles Folder", "file:///"..filesystem.store_dir() .. 'Policify\\vehicles\\', "Open local Vehicles folder")
 
@@ -2102,4 +2086,3 @@ util.create_tick_handler(function()
     policify_tick()
     return true
 end)
-
