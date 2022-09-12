@@ -3,7 +3,7 @@
 -- Enable Policify option to modify current vehicle, disable option to remove modifications
 -- Modifies horn, paint, ne[on, and headlights. Flashes headlights and neon between red and blue.
 
-local SCRIPT_VERSION = "3.0b4"
+local SCRIPT_VERSION = "3.0b5"
 local SELECTED_BRANCH = "dev"
 local AUTO_UPDATE_BRANCHES = {"main", "dev"}
 
@@ -2073,10 +2073,27 @@ local script_meta_menu = menu.list(menu.my_root(), "Script Meta")
 
 menu.divider(script_meta_menu, "Policify")
 menu.readonly(script_meta_menu, "Version", SCRIPT_VERSION)
-menu.list_select(script_meta_menu, "Branch", {}, "Switch from main to dev branch to get cutting edge updates, but also potentially more bugs.", AUTO_UPDATE_BRANCHES, 1, function(index)
-    util.toast("["..SCRIPT_VERSION.."]Menu auto-updating "..AUTO_UPDATE_BRANCHES[index], TOAST_ALL)
-    auto_update_branch(AUTO_UPDATE_BRANCHES[index])
+
+local release_branches = {
+    {
+        "main",
+        {},
+        "More stable, but updated less often.",
+        "main",
+    },
+    {
+        "dev",
+        {},
+        "Cutting edge updates, but less stable.",
+        "dev",
+    },
+}
+
+menu.list_select(script_meta_menu, "Release Branch", {}, "Switch from main to dev to get cutting edge updates, but also potentially more bugs.", release_branches, 1, function(index)
+    util.toast("["..SCRIPT_VERSION.."]Menu auto-updating "..release_branches[index], TOAST_ALL)
+    auto_update_branch(release_branches[index])
 end)
+
 menu.hyperlink(script_meta_menu, "Github Source", "https://github.com/hexarobi/stand-lua-policify", "View source files on Github")
 menu.hyperlink(script_meta_menu, "Vehicles Folder", "file:///"..filesystem.store_dir() .. 'Policify\\vehicles\\', "Open local Vehicles folder")
 
