@@ -4,7 +4,7 @@
 -- Save and share your polcified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0b9"
+local SCRIPT_VERSION = "3.0b10"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -48,6 +48,8 @@ local config = {
         model = "police",
     },
     source_code_branch = "main",
+    edit_offset_step = 1,
+    edit_rotation_step = 1,
 }
 
 local VEHICLE_STORE_DIR = filesystem.store_dir() .. 'Policify\\vehicles\\'
@@ -1351,20 +1353,6 @@ local function serialize_vehicle_attributes(attachment)
     -- Create pointers to hold color values
     local color = { r = memory.alloc(4), g = memory.alloc(4), b = memory.alloc(4) }
 
-    serialized_vehicle.headlights_color = VEHICLE._GET_VEHICLE_XENON_LIGHTS_COLOR(attachment.handle)
-    serialized_vehicle.headlights_type = VEHICLE.IS_TOGGLE_MOD_ON(attachment.handle, 22)
-
-    serialized_vehicle.neon = {
-        left = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(attachment.handle, 0),
-        right = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(attachment.handle, 1),
-        front = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(attachment.handle, 2),
-        back = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(attachment.handle, 3),
-    }
-    if (serialized_vehicle.neon.left or serialized_vehicle.neon.right or serialized_vehicle.neon.front or serialized_vehicle.neon.back) then
-        VEHICLE._GET_VEHICLE_NEON_LIGHTS_COLOUR(attachment.handle, color.r, color.g, color.b)
-        serialized_vehicle.neon_color = { r = memory.read_int(color.r), g = memory.read_int(color.g), b = memory.read_int(color.b) }
-    end
-
     serialized_vehicle.paint.primary.is_custom = VEHICLE.GET_IS_VEHICLE_PRIMARY_COLOUR_CUSTOM(attachment.handle)
     if serialized_vehicle.paint.primary.is_custom then
         VEHICLE.GET_VEHICLE_CUSTOM_PRIMARY_COLOUR(attachment.handle, color.r, color.g, color.b)
@@ -1386,27 +1374,57 @@ local function serialize_vehicle_attributes(attachment)
         serialized_vehicle.paint.secondary.color = memory.read_int(color.g)
     end
 
-    --VEHICLE.GET_VEHICLE_COLOR(attachment.handle, color.r, color.g, color.b)
-    --serialized_vehicle.paint.vehicle_color = { r = memory.read_int(color.r), g = memory.read_int(color.g), b = memory.read_int(color.b) }
     VEHICLE.GET_VEHICLE_EXTRA_COLOURS(attachment.handle, color.r, color.g)
     serialized_vehicle.paint.extra_colors = { pearlescent = memory.read_int(color.r), wheel = memory.read_int(color.g) }
-    --VEHICLE.GET_VEHICLE_COLOURS(attachment.handle, color.r, color.g)
-    --serialized_vehicle.paint.primary. = memory.read_int(color.r)
-    --Vehicle["Secondary"] = memory.read_int(color.g)
-    --memory.free(color.r)
-    --memory.free(color.g)
-    --memory.free(color.b)
-    --attachment.save_data.Colors = {
-    --    Primary = Primary,
-    --    Secondary = Secondary,
-    --    ["Color Combo"] = VEHICLE.GET_VEHICLE_COLOUR_COMBINATION(attachment.handle),
-    --    ["Paint Fade"] = VEHICLE.GET_VEHICLE_ENVEFF_SCALE(attachment.handle),
-    --    Vehicle = Vehicle,
-    --    Extras = ColorExtras
-    --}
+    VEHICLE._GET_VEHICLE_DASHBOARD_COLOR(attachment.handle, color.r)
+    serialized_vehicle.paint.dashboard_color = memory.read_int(color.r)
+    VEHICLE._GET_VEHICLE_INTERIOR_COLOR(attachment.handle, color.r)
+    serialized_vehicle.paint.interior_color = memory.read_int(color.r)
     serialized_vehicle.paint.fade = VEHICLE.GET_VEHICLE_ENVEFF_SCALE(attachment.handle)
-    --attachment.save_data.Livery.style = VEHICLE.GET_VEHICLE_MOD(attachment.handle, 48)
 
+    serialized_vehicle.neon = {
+        left = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(attachment.handle, 0),
+        right = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(attachment.handle, 1),
+        front = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(attachment.handle, 2),
+        back = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(attachment.handle, 3),
+    }
+    if (serialized_vehicle.neon.left or serialized_vehicle.neon.right or serialized_vehicle.neon.front or serialized_vehicle.neon.back) then
+        VEHICLE._GET_VEHICLE_NEON_LIGHTS_COLOUR(attachment.handle, color.r, color.g, color.b)
+        serialized_vehicle.neon_color = { r = memory.read_int(color.r), g = memory.read_int(color.g), b = memory.read_int(color.b) }
+    end
+
+    serialized_vehicle.wheel_type = VEHICLE.GET_VEHICLE_WHEEL_TYPE(attachment.handle)
+    VEHICLE.GET_VEHICLE_TYRE_SMOKE_COLOR(attachment.handle, color.r, color.g, color.b)
+    serialized_vehicle.tire_smoke_color = { r = memory.read_int(color.r), g = memory.read_int(color.g), b = memory.read_int(color.b) }
+
+    serialized_vehicle.headlights_color = VEHICLE._GET_VEHICLE_XENON_LIGHTS_COLOR(attachment.handle)
+    serialized_vehicle.bulletproof_tires = VEHICLE.GET_VEHICLE_TYRES_CAN_BURST(attachment.handle)
+    serialized_vehicle.window_tint = VEHICLE.GET_VEHICLE_WINDOW_TINT(attachment.handle)
+    serialized_vehicle.radio_loud = AUDIO.CAN_VEHICLE_RECEIVE_CB_RADIO(attachment.handle)
+    serialized_vehicle.engine_running = VEHICLE.GET_IS_VEHICLE_ENGINE_RUNNING(attachment.handle)
+    serialized_vehicle.siren = VEHICLE.IS_VEHICLE_SIREN_AUDIO_ON(attachment.handle)
+    serialized_vehicle.emergency_lights = VEHICLE.IS_VEHICLE_SIREN_ON(attachment.handle)
+    serialized_vehicle.search_light = VEHICLE.IS_VEHICLE_SEARCHLIGHT_ON(attachment.handle)
+    serialized_vehicle.license_plate_text = VEHICLE.GET_VEHICLE_NUMBER_PLATE_TEXT(attachment.handle)
+    serialized_vehicle.license_plate_type = VEHICLE.GET_VEHICLE_NUMBER_PLATE_TEXT_INDEX(attachment.handle)
+    serialized_vehicle.dirt_level = VEHICLE.GET_VEHICLE_DIRT_LEVEL(attachment.handle)
+
+    serialized_vehicle.mods = {}
+    for mod_index = 1, 48 do
+        serialized_vehicle.mods[mod_index] = VEHICLE.GET_VEHICLE_MOD(attachment.handle, mod_index)
+    end
+
+    serialized_vehicle.extras = {}
+    for extra_index = 1, 14 do
+        if VEHICLE.DOES_EXTRA_EXIST(attachment.handle, extra_index) then
+            serialized_vehicle.extras[extra_index] = VEHICLE.IS_VEHICLE_EXTRA_TURNED_ON(attachment.handle, extra_index)
+        end
+    end
+
+    serialized_vehicle.mod_toggles = {}
+    for mod_toggle_index = 18, 23 do
+        serialized_vehicle.mod_toggles[mod_toggle_index] = VEHICLE.IS_TOGGLE_MOD_ON(attachment.handle, mod_toggle_index - 1)
+    end
 
     memory.free(color.r) memory.free(color.g) memory.free(color.b)
     return serialized_vehicle
@@ -1415,9 +1433,6 @@ end
 local function deserialize_vehicle_attributes(attachment)
     if attachment.vehicle_attributes == nil then return end
     local serialized_vehicle = attachment.vehicle_attributes
-
-    VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(attachment.handle, serialized_vehicle.headlights_color)
-    VEHICLE.TOGGLE_VEHICLE_MOD(attachment.handle, serialized_vehicle.headlights_type or false)
 
     VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(attachment.handle, 0, serialized_vehicle.neon.left or false)
     VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(attachment.handle, 1, serialized_vehicle.neon.right or false)
@@ -1471,22 +1486,51 @@ local function deserialize_vehicle_attributes(attachment)
         )
     end
 
-    --VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(attachment.handle, attachment.save_data.Colors.Vehicle.r, attachment.save_data.Colors.Vehicle.g, attachment.save_data.Colors.Vehicle.b)
-    --VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(attachment.handle, attachment.save_data.Colors.Vehicle.r, attachment.save_data.Colors.Vehicle.g, attachment.save_data.Colors.Vehicle.b)
-    --VEHICLE.SET_VEHICLE_COLOURS(attachment.handle, attachment.save_data.Colors.Vehicle.Primary or 0, attachment.save_data.Colors.Vehicle.Secondary or 0)
-    --if attachment.save_data.Colors.Primary.Custom and attachment.save_data.Colors.Primary["Custom Color"] then
-    --    VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(attachment.handle, attachment.save_data.Colors.Primary["Custom Color"].r, attachment.save_data.Colors.Primary["Custom Color"].b, attachment.save_data.Colors.Primary["Custom Color"].g)
-    --else
-    --    VEHICLE.SET_VEHICLE_MOD_COLOR_1(attachment.handle, attachment.save_data.Colors.Primary["Paint Type"], attachment.save_data.Colors.Primary.Color, attachment.save_data.Colors.Primary["Pearlescent Color"])
-    --end
-    --if attachment.save_data.Colors.Secondary.Custom and attachment.save_data.Colors.Secondary["Custom Color"] then
-    --    VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(attachment.handle, attachment.save_data.Colors.Secondary["Custom Color"].r, attachment.save_data.Colors.Secondary["Custom Color"].b, attachment.save_data.Colors.Secondary["Custom Color"].g)
-    --else
-    --    VEHICLE.SET_VEHICLE_MOD_COLOR_2(attachment.handle, attachment.save_data.Colors.Secondary["Paint Type"], attachment.save_data.Colors.Secondary.Color)
-    --end
+    VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(attachment.handle, serialized_vehicle.headlights_color)
+    VEHICLE._SET_VEHICLE_DASHBOARD_COLOR(attachment.handle, serialized_vehicle.paint.dashboard_color or -1)
+    VEHICLE._SET_VEHICLE_INTERIOR_COLOR(attachment.handle, serialized_vehicle.paint.interior_color or -1)
+
     VEHICLE.SET_VEHICLE_ENVEFF_SCALE(attachment.handle, serialized_vehicle.paint.fade or 0)
 
-    VEHICLE.SET_VEHICLE_MOD(attachment.handle, 48, attachment.save_data.Livery.style or -1)
+    VEHICLE.SET_VEHICLE_TYRES_CAN_BURST(attachment.handle, serialized_vehicle.bulletproof_tires or false)
+    VEHICLE.SET_VEHICLE_WHEEL_TYPE(attachment.handle, serialized_vehicle.wheel_type or -1)
+    VEHICLE.SET_VEHICLE_TYRE_SMOKE_COLOR(attachment.handle, serialized_vehicle.tire_smoke_color.r or 255,
+            serialized_vehicle.tire_smoke_color.g or 255, serialized_vehicle.tire_smoke_color.b or 255)
+
+    if serialized_vehicle.siren then
+        AUDIO.SET_SIREN_WITH_NO_DRIVER(attachment.handle, true)
+        VEHICLE.SET_VEHICLE_HAS_MUTED_SIRENS(attachment.handle, false)
+        AUDIO._SET_SIREN_KEEP_ON(attachment.handle, true)
+        AUDIO._TRIGGER_SIREN(attachment.handle, true)
+    end
+    VEHICLE.SET_VEHICLE_SIREN(attachment.handle, serialized_vehicle.emergency_lights or false)
+    VEHICLE.SET_VEHICLE_SEARCHLIGHT(attachment.handle, serialized_vehicle.search_light or false, true)
+    AUDIO.SET_VEHICLE_RADIO_LOUD(attachment.handle, serialized_vehicle.radio_loud or false)
+    VEHICLE.SET_VEHICLE_DIRT_LEVEL(attachment.handle, serialized_vehicle.dirt_level or 0.0)
+    VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT(attachment.handle, serialized_vehicle.license_plate_text or "UNKNOWN")
+    VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT_INDEX(attachment.handle, serialized_vehicle.license_plate_type or -1)
+
+    if serialized_vehicle.engine_running then
+        VEHICLE.SET_VEHICLE_ENGINE_ON(attachment.handle, true, true, false)
+    end
+
+    for mod_index = 1,48,1 do
+        VEHICLE.SET_VEHICLE_MOD(attachment.handle, mod_index, serialized_vehicle.mods[mod_index] or -1)
+    end
+
+    for extra_index = 1, 14 do
+        local state = true
+        if serialized_vehicle.extras[extra_index] ~= nil then
+            state = serialized_vehicle.extras[extra_index]
+        end
+        VEHICLE.SET_VEHICLE_EXTRA(attachment.handle, extra_index, not state)
+    end
+
+    for mod_toggle_index = 18, 23 do
+        VEHICLE.TOGGLE_VEHICLE_MOD(attachment.handle, mod_toggle_index - 1, serialized_vehicle.mod_toggles[mod_toggle_index])
+    end
+
+    ENTITY.SET_ENTITY_AS_MISSION_ENTITY(attachment.handle, true, true)
 
 end
 
@@ -1544,7 +1588,6 @@ local function spawn_loaded_vehicle(policified_vehicle)
     refresh_siren_light_status(policified_vehicle)
     table.insert(policified_vehicles, policified_vehicle)
     last_policified_vehicle = policified_vehicle
-    -- TODO: children
 end
 
 ---
@@ -1609,6 +1652,25 @@ local function rebuild_add_attachments_menu(attachment)
                 end
             end)
 
+
+    --local clone_menu = menu.list(attachment.menus.add_attachment, "Clone")
+
+    menu.action(attachment.menus.add_attachment, "Clone", {}, "", function()
+        local new_attachment = {
+            root = attachment.root,
+            parent = attachment,
+            name = attachment.name .. " (Clone)",
+            model = attachment.model,
+            type = "VEHICLE",
+        }
+        attach_attachment_with_children(new_attachment)
+        refresh_siren_light_status(new_attachment)
+        local newly_added_edit_menu = attachment.menus.rebuild_edit_attachments_menu(attachment)
+        if newly_added_edit_menu then
+            menu.focus(newly_added_edit_menu)
+        end
+    end)
+
 end
 
 local function rebuild_edit_attachments_menu(parent_attachment)
@@ -1619,32 +1681,32 @@ local function rebuild_edit_attachments_menu(parent_attachment)
             attachment.menus.main = menu.list(attachment.parent.menus.edit_attachments, attachment.name or "unknown")
 
             menu.divider(attachment.menus.main, "Position")
-            local first_menu = menu.slider_float(attachment.menus.main, "X: Left / Right", {}, "", -500000, 500000, math.floor(attachment.offset.x * 100), 1, function(value)
+            local first_menu = menu.slider_float(attachment.menus.main, "X: Left / Right", {}, "", -500000, 500000, math.floor(attachment.offset.x * 100), config.edit_offset_step, function(value)
                 attachment.offset.x = value / 100
                 move_attachment(attachment)
             end)
             if focus == nil then
                 focus = first_menu
             end
-            menu.slider_float(attachment.menus.main, "Y: Forward / Back", {}, "", -500000, 500000, math.floor(attachment.offset.y * -100), 1, function(value)
+            menu.slider_float(attachment.menus.main, "Y: Forward / Back", {}, "", -500000, 500000, math.floor(attachment.offset.y * -100), config.edit_offset_step, function(value)
                 attachment.offset.y = value / -100
                 move_attachment(attachment)
             end)
-            menu.slider_float(attachment.menus.main, "Z: Up / Down", {}, "", -500000, 500000, math.floor(attachment.offset.z * -100), 1, function(value)
+            menu.slider_float(attachment.menus.main, "Z: Up / Down", {}, "", -500000, 500000, math.floor(attachment.offset.z * -100), config.edit_offset_step, function(value)
                 attachment.offset.z = value / -100
                 move_attachment(attachment)
             end)
 
             menu.divider(attachment.menus.main, "Rotation")
-            menu.slider(attachment.menus.main, "X: Pitch", {}, "", -175, 180, math.floor(attachment.rotation.x), 5, function(value)
+            menu.slider(attachment.menus.main, "X: Pitch", {}, "", -179, 180, attachment.rotation.x, config.edit_rotation_step, function(value)
                 attachment.rotation.x = value
                 move_attachment(attachment)
             end)
-            menu.slider(attachment.menus.main, "Y: Roll", {}, "", -175, 180, math.floor(attachment.rotation.y), 5, function(value)
+            menu.slider(attachment.menus.main, "Y: Roll", {}, "", -179, 180, attachment.rotation.y, config.edit_rotation_step, function(value)
                 attachment.rotation.y = value
                 move_attachment(attachment)
             end)
-            menu.slider(attachment.menus.main, "Z: Yaw", {}, "", -175, 180, math.floor(attachment.rotation.z), 5, function(value)
+            menu.slider(attachment.menus.main, "Z: Yaw", {}, "", -179, 180, attachment.rotation.z, config.edit_rotation_step, function(value)
                 attachment.rotation.z = value
                 move_attachment(attachment)
             end)
@@ -2031,9 +2093,19 @@ end
 
 local options_menu = menu.list(menu.my_root(), "Options")
 
-menu.slider(options_menu, "Flash Delay", { "policifydelay" }, "Setting a too low value may not network the colors to other players!", 20, 150, 50, 10, function(value)
+menu.divider(options_menu, "Global Configs")
+
+menu.slider(options_menu, "Flash Delay", { "policifydelay" }, "Setting a too low value may not network the colors to other players!", 20, 150, config.flash_delay, 10, function(value)
     config.flash_delay = value
 end)
+menu.slider(options_menu, "Edit Offset Step", {}, "The amount of change each time you edit an attachment offset", 1, 20, config.edit_offset_step, 1, function(value)
+    config.edit_offset_step = value
+end)
+menu.slider(options_menu, "Edit Rotation Step", {}, "The amount of change each time you edit an attachment rotation", 1, 15, config.edit_rotation_step, 1, function(value)
+    config.edit_rotation_step = value
+end)
+
+menu.divider(options_menu, "Defaults for New Vehicles")
 
 menu.toggle(options_menu, "Override Paint", {}, "If enabled, will override vehicle paint to matte black", function(toggle)
     config.override_paint = toggle
@@ -2086,3 +2158,4 @@ util.create_tick_handler(function()
     policify_tick()
     return true
 end)
+
