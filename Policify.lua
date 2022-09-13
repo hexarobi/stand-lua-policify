@@ -4,12 +4,16 @@
 -- Save and share your polcified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0b10"
+local SCRIPT_VERSION = "3.0b11"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
 }
 local SELECTED_BRANCH_INDEX = 2
+
+---
+--- Auto-Updater
+---
 
 local auto_update_source_url = "https://raw.githubusercontent.com/hexarobi/stand-lua-policify/main/Policify.lua"
 local status, lib = pcall(require, "auto-updater")
@@ -29,6 +33,10 @@ local function auto_update_branch(selected_branch)
     run_auto_update({source_url=branch_source_url, script_relpath=SCRIPT_RELPATH, verify_file_begins_with="--"})
 end
 auto_update_branch(AUTO_UPDATE_BRANCHES[SELECTED_BRANCH_INDEX][1])
+
+---
+--- Data
+---
 
 local SIRENS_OFF = 1
 local SIRENS_LIGHTS_ONLY = 2
@@ -50,6 +58,7 @@ local config = {
     source_code_branch = "main",
     edit_offset_step = 1,
     edit_rotation_step = 1,
+    annoying_sirens = false,
 }
 
 local VEHICLE_STORE_DIR = filesystem.store_dir() .. 'Policify\\vehicles\\'
@@ -66,43 +75,36 @@ ensure_directory_exists(VEHICLE_STORE_DIR)
 local policified_vehicles = {}
 local last_policified_vehicle
 
-local example_policified_vehicle = {
-    name="Police",
-    model="police",
-    handle=1234,
-    options = {},
-    save_data = {},
-    attachments = {},
-}
-
-local example_attachment = {
-    name="Child #1",            -- Name for this attachment
-    handle=5678,                -- Handle for this attachment
-    root=example_policified_vehicle,
-    parent=1234,                -- Parent Handle
-    bone_index = 0,             -- Which bone of the parent should this attach to
-    offset = { x=0, y=0, z=0 },  -- Offset coords from parent
-    rotation = { x=0, y=0, z=0 },-- Rotation from parent
-    children = {
-        -- Other attachments
-    },
-    reflections = {
-        -- Other attachments
-        reflection_axis = { x = true, y = false, z = false },   -- Which axis should be reflected about
-    },
-    is_visible = true,
-    has_collision = true,
-    has_gravity = true,
-    is_light_disabled = true,   -- If true this light will always be off, regardless of siren settings
-}
+--local example_policified_vehicle = {
+--    name="Police",
+--    model="police",
+--    handle=1234,
+--    options = {},
+--    save_data = {},
+--    attachments = {},
+--}
+--
+--local example_attachment = {
+--    name="Child #1",            -- Name for this attachment
+--    handle=5678,                -- Handle for this attachment
+--    root=example_policified_vehicle,
+--    parent=1234,                -- Parent Handle
+--    bone_index = 0,             -- Which bone of the parent should this attach to
+--    offset = { x=0, y=0, z=0 },  -- Offset coords from parent
+--    rotation = { x=0, y=0, z=0 },-- Rotation from parent
+--    children = {
+--        -- Other attachments
+--        reflection_axis = { x = true, y = false, z = false },   -- Which axis should be reflected about
+--    },
+--    is_visible = true,
+--    has_collision = true,
+--    has_gravity = true,
+--    is_light_disabled = true,   -- If true this light will always be off, regardless of siren settings
+--}
 
 local policified_vehicle_base = {
     target_version = SCRIPT_VERSION,
-    --attachments = {},
     children = {},
-    --spawned_children = {},
-    invis_siren_handle = nil,
-    invis_siren_ped_handle = nil,
     options = {
         override_paint = config.override_paint,
         override_headlights = config.override_headlights,
@@ -508,25 +510,14 @@ local available_attachments = {
 }
 
 local siren_types = {
-    {
-        "Police Cruiser",
-        {},
-        "A slow wail",
-        "police",
-    },
-    {
-        "Police Bike",
-        {},
-        "A fast chirp",
-        "policeb",
-    },
-    {
-        "Ambulance",
-        {},
-        "A slightly different wail",
-        "ambulance",
-    },
+    { "Police Cruiser", {}, "A slow wail", "police", },
+    { "Police Bike", {}, "A fast chirp", "policeb", },
+    { "Ambulance", {}, "A slightly different wail", "ambulance", },
 }
+
+---
+--- Utilities
+---
 
 util.require_natives(1660775568)
 local json = require("json")
@@ -546,6 +537,7 @@ end
 function string.starts(String,Start)
     return string.sub(String,1,string.len(Start))==Start
 end
+
 -- From https://stackoverflow.com/questions/12394841/safely-remove-items-from-an-array-table-while-iterating
 local function array_remove(t, fnKeep)
     local j, n = 1, #t;
@@ -566,41 +558,16 @@ local function array_remove(t, fnKeep)
     return t;
 end
 
---local function policify_tick_ying()
---    for _, policified_vehicle in pairs(policified_vehicles) do
---        if policified_vehicle.options.siren_status == SIRENS_LIGHTS_ONLY or policified_vehicle.options.siren_status == SIRENS_ALL_ON then
---            if policified_vehicle.options.override_headlights then
---                VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(policified_vehicle.handle, 8)
---            end
---            if policified_vehicle.options.override_neon then
---                VEHICLE._SET_VEHICLE_NEON_LIGHTS_COLOUR(policified_vehicle.handle, 0, 0, 255)
---            end
---        end
---        for _, attachment in pairs(policified_vehicle.attachments) do
---            if attachment.flash_start_on ~= nil then
---                ENTITY.SET_ENTITY_VISIBLE(attachment.handle, (not attachment.flash_start_on), 0)
---            end
---        end
---    end
---end
---
---local function policify_tick_yang()
---    for _, policified_vehicle in pairs(policified_vehicles) do
---        if policified_vehicle.options.siren_status == SIRENS_LIGHTS_ONLY or policified_vehicle.options.siren_status == SIRENS_ALL_ON then
---            if policified_vehicle.options.override_headlights then
---                VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(policified_vehicle.handle, 1)
---            end
---            if policified_vehicle.options.override_neon then
---                VEHICLE._SET_VEHICLE_NEON_LIGHTS_COLOUR(policified_vehicle.handle, 255, 0, 0)
---            end
---        end
---        for _, attachment in pairs(policified_vehicle.attachments) do
---            if attachment.flash_start_on ~= nil then
---                ENTITY.SET_ENTITY_VISIBLE(attachment.handle, attachment.flash_start_on, 0)
---            end
---        end
---    end
---end
+local function load_hash(hash)
+    STREAMING.REQUEST_MODEL(hash)
+    while not STREAMING.HAS_MODEL_LOADED(hash) do
+        util.yield()
+    end
+end
+
+---
+--- Tick Phase
+---
 
 local phase_options = {
     headlight_colors = {1, 8},
@@ -643,76 +610,9 @@ local function policify_tick()
     end
 end
 
-local function load_hash(hash)
-    STREAMING.REQUEST_MODEL(hash)
-    while not STREAMING.HAS_MODEL_LOADED(hash) do
-        util.yield()
-    end
-end
-
-local function show_busyspinner(text)
-    HUD.BEGIN_TEXT_COMMAND_BUSYSPINNER_ON("STRING")
-    HUD.ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME(text)
-    HUD.END_TEXT_COMMAND_BUSYSPINNER_ON(2)
-end
-
--- From Jackz Vehicle Options script
--- Gets the player's vehicle, attempts to request control. Returns 0 if unable to get control
---local function get_player_vehicle_in_control(pid, opts)
---    local my_ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(players.user()) -- Needed to turn off spectating while getting control
---    local target_ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid)
---
---    -- Calculate how far away from target
---    local pos1 = ENTITY.GET_ENTITY_COORDS(target_ped)
---    local pos2 = ENTITY.GET_ENTITY_COORDS(my_ped)
---    local dist = SYSTEM.VDIST2(pos1.x, pos1.y, 0, pos2.x, pos2.y, 0)
---
---    local was_spectating = NETWORK.NETWORK_IS_IN_SPECTATOR_MODE() -- Needed to toggle it back on if currently spectating
---    -- If they out of range (value may need tweaking), auto spectate.
---    local vehicle = PED.GET_VEHICLE_PED_IS_IN(target_ped, false)
---    if opts and opts.near_only and vehicle == 0 then
---        return 0
---    end
---    if vehicle == 0 and target_ped ~= my_ped and dist > 340000 and not was_spectating then
---        util.toast("Player is too far, auto-spectating for upto 3s.")
---        show_busyspinner("Player is too far, auto-spectating for upto 3s.")
---        NETWORK.NETWORK_SET_IN_SPECTATOR_MODE(true, target_ped)
---        -- To prevent a hard 3s loop, we keep waiting upto 3s or until vehicle is acquired
---        local loop = (opts and opts.loops ~= nil) and opts.loops or 30 -- 3000 / 100
---        while vehicle == 0 and loop > 0 do
---            util.yield(100)
---            vehicle = PED.GET_VEHICLE_PED_IS_IN(target_ped, true)
---            loop = loop - 1
---        end
---        HUD.BUSYSPINNER_OFF()
---    end
---
---    if vehicle > 0 then
---        if NETWORK.NETWORK_HAS_CONTROL_OF_ENTITY(vehicle) then
---            return vehicle
---        end
---        -- Loop until we get control
---        local netid = NETWORK.NETWORK_GET_NETWORK_ID_FROM_ENTITY(vehicle)
---        local has_control_ent = false
---        local loops = 15
---        NETWORK.SET_NETWORK_ID_CAN_MIGRATE(netid, true)
---
---        -- Attempts 15 times, with 8ms per attempt
---        while not has_control_ent do
---            has_control_ent = NETWORK.NETWORK_REQUEST_CONTROL_OF_ENTITY(vehicle)
---            loops = loops - 1
---            -- wait for control
---            util.yield(15)
---            if loops <= 0 then
---                break
---            end
---        end
---    end
---    if not was_spectating then
---        NETWORK.NETWORK_SET_IN_SPECTATOR_MODE(false, target_ped)
---    end
---    return vehicle
---end
+---
+--- Policify Overrides
+---
 
 local function save_headlights(policified_vehicle)
     local lights_on = memory.alloc(1)
@@ -923,6 +823,18 @@ local function restore_plate(policified_vehicle)
     VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT_INDEX(policified_vehicle.handle, policified_vehicle.save_data["License Plate"].Type)
 end
 
+local function refresh_plate_text(policified_vehicle)
+    if policified_vehicle.options.override_plate then
+        set_plate(policified_vehicle)
+    else
+        restore_plate(policified_vehicle)
+    end
+end
+
+---
+--- Siren Controls
+---
+
 local function activate_lights(attachment)
     if attachment.is_light_disabled then
         ENTITY.SET_ENTITY_LIGHTS(attachment.handle, true)
@@ -947,12 +859,6 @@ local function deactivate_lights(attachment)
     end
 end
 
-local function deactivate_vehicle_siren(attachment)
-    --AUDIO._SET_SIREN_KEEP_ON(policified_vehicle.handle, false)
-    VEHICLE.SET_VEHICLE_HAS_MUTED_SIRENS(attachment.handle, true)
-    --VEHICLE.SET_VEHICLE_SIREN(policified_vehicle.handle, false)
-end
-
 local function activate_sirens(attachment)
     if attachment.type == "VEHICLE" then
         VEHICLE.SET_VEHICLE_HAS_MUTED_SIRENS(attachment.handle, false)
@@ -967,9 +873,11 @@ end
 
 local function deactivate_sirens(attachment)
     if attachment.type == "VEHICLE" then
-        --AUDIO._SET_SIREN_KEEP_ON(policified_vehicle.handle, false)
-        VEHICLE.SET_VEHICLE_HAS_MUTED_SIRENS(attachment.handle, true)
-        --VEHICLE.SET_VEHICLE_SIREN(policified_vehicle.handle, false)
+        if config.annoying_sirens then
+            VEHICLE.SET_VEHICLE_HAS_MUTED_SIRENS(attachment.handle, true) -- Only works locally
+        else
+            VEHICLE.SET_VEHICLE_SIREN(attachment.handle, false) -- Networks but also turns off vehicle siren lights
+        end
     end
     for _, child_attachment in pairs(attachment.children) do
         deactivate_sirens(child_attachment)
@@ -985,21 +893,16 @@ local function sound_blip(attachment)
     end
 end
 
+---
+--- Attachment Construction
+---
+
 local function set_attachment_internal_collisions(attachment, new_attachment)
     ENTITY.SET_ENTITY_NO_COLLISION_ENTITY(attachment.handle, new_attachment.handle)
     for _, child_attachment in pairs(attachment.children) do
         set_attachment_internal_collisions(child_attachment, new_attachment)
     end
 end
-
---local function set_attachment_internal_collisions(attachment)
---    -- Mark attachment as no collision with every other attachment on the vehicle
---    for _, attachment2 in pairs(attachment.root.attachments) do
---        ENTITY.SET_ENTITY_NO_COLLISION_ENTITY(attachment2.handle, attachment.handle)
---    end
---    ENTITY.SET_ENTITY_NO_COLLISION_ENTITY(attachment.root.handle, attachment.handle)
---    table.insert(attachment.root.attachments, attachment)
---end
 
 local function set_attachment_defaults(attachment)
     if attachment.offset == nil then
@@ -1130,11 +1033,6 @@ local function detach_attachment(attachment)
             detach_attachment(t[i])
         end)
     end
-    --if attachment.attachments then
-    --    array_remove(attachment.attachments, function(t, i, j)
-    --        detach_attachment(t[i])
-    --    end)
-    --end
     if attachment ~= attachment.root then
         entities.delete_by_handle(attachment.handle)
     end
@@ -1189,6 +1087,10 @@ local function attach_attachment_with_children(new_attachment, child_counter)
     return attachment
 end
 
+---
+--- Build Invis Siren
+---
+
 local function attach_invis_siren(policified_vehicle)
     attach_attachment_with_children({
         root = policified_vehicle,
@@ -1242,13 +1144,9 @@ local function refresh_siren_light_status(policified_vehicle)
     end
 end
 
-local function refresh_plate_text(policified_vehicle)
-    if policified_vehicle.options.override_plate then
-        set_plate(policified_vehicle)
-    else
-        restore_plate(policified_vehicle)
-    end
-end
+---
+--- Control Overrides
+---
 
 local function add_overrides_to_vehicle(policified_vehicle)
     if policified_vehicle.options.override_headlights then
@@ -1653,23 +1551,42 @@ local function rebuild_add_attachments_menu(attachment)
             end)
 
 
-    --local clone_menu = menu.list(attachment.menus.add_attachment, "Clone")
+    local clone_menu = menu.list(attachment.menus.add_attachment, "Clone")
 
-    menu.action(attachment.menus.add_attachment, "Clone", {}, "", function()
+    menu.action(clone_menu, "Clone (In Place)", {}, "", function()
         local new_attachment = {
             root = attachment.root,
-            parent = attachment,
+            parent = attachment.parent,
             name = attachment.name .. " (Clone)",
             model = attachment.model,
             type = "VEHICLE",
+            offset = table.table_copy(attachment.offset),
+            rotation = table.table_copy(attachment.rotation),
         }
         attach_attachment_with_children(new_attachment)
         refresh_siren_light_status(new_attachment)
-        local newly_added_edit_menu = attachment.menus.rebuild_edit_attachments_menu(attachment)
+        local newly_added_edit_menu = attachment.menus.rebuild_edit_attachments_menu(attachment.root)
         if newly_added_edit_menu then
             menu.focus(newly_added_edit_menu)
         end
     end)
+
+    --menu.action(clone_menu, "Clone Reflection: Left/Right", {}, "", function()
+    --    local new_attachment = {
+    --        root = attachment.root,
+    --        parent = attachment.parent,
+    --        name = attachment.name .. " (Reflection)",
+    --        model = attachment.model,
+    --        type = "VEHICLE",
+    --        offset = {x=-attachment.offset.x, y=attachment.offset.y, z=attachment.offset.z}
+    --    }
+    --    attach_attachment_with_children(new_attachment)
+    --    refresh_siren_light_status(new_attachment)
+    --    local newly_added_edit_menu = attachment.menus.rebuild_edit_attachments_menu(attachment)
+    --    if newly_added_edit_menu then
+    --        menu.focus(newly_added_edit_menu)
+    --    end
+    --end)
 
 end
 
@@ -1787,7 +1704,7 @@ local function rebuild_policified_vehicle_menu()
                 refresh_siren_light_status(policified_vehicle)
             end)
 
-            --menu.divider(policified_vehicle.menu, "Attachments")
+            menu.divider(policified_vehicle.menus.main, "Attachments")
             policified_vehicle.menus.add_attachment = menu.list(policified_vehicle.menus.main, "Add Attachment", {}, "", function()
                 rebuild_add_attachments_menu(policified_vehicle)
             end)
@@ -1911,6 +1828,11 @@ local function rebuild_policified_vehicle_menu()
                 refresh_invis_police_sirens(policified_vehicle)
                 refresh_siren_light_status(policified_vehicle)
                 rebuild_edit_attachments_menu(policified_vehicle)
+            end)
+
+            menu.divider(policified_vehicle.menus.main, "Actions")
+            menu.action(policified_vehicle.menus.main, "Enter Drivers Seat", {}, "", function()
+                PED.SET_PED_INTO_VEHICLE(PLAYER.PLAYER_PED_ID(), policified_vehicle.handle, -1)
             end)
 
             menu.action(policified_vehicle.menus.main, "Save Vehicle", {}, "Save this vehicle so it can be retrieved in the future", function()
@@ -2109,23 +2031,23 @@ menu.divider(options_menu, "Defaults for New Vehicles")
 
 menu.toggle(options_menu, "Override Paint", {}, "If enabled, will override vehicle paint to matte black", function(toggle)
     config.override_paint = toggle
-end, true)
+end, config.override_paint)
 
 menu.toggle(options_menu, "Override Headlights", {}, "If enabled, will override vehicle headlights to flash blue and red", function(toggle)
     config.override_headlights = toggle
-end, true)
+end, config.override_headlights)
 
 menu.toggle(options_menu, "Override Neon", {}, "If enabled, will override vehicle neon to flash red and blue", function(toggle)
     config.override_neon = toggle
-end, true)
+end, config.override_neon)
 
 menu.toggle(options_menu, "Override Horn", {}, "If enabled, will override vehicle horn to police horn", function(toggle)
     config.override_horn = toggle
-end, true)
+end, config.override_horn)
 
 menu.toggle(options_menu, "Override Plate", {}, "If enabled, will override vehicle plate with custom exempt plate", function(toggle)
     config.override_plate = toggle
-end, true)
+end, config.override_plate)
 
 menu.text_input(options_menu, "Set Plate Text", { "setpoliceplatetext" }, "Set the text for the exempt police plates", function(value)
     config.plate_text = value
@@ -2133,7 +2055,11 @@ end, config.plate_text)
 
 menu.toggle(options_menu, "Enable Invis Siren", {}, "If enabled, will attach an invisible emergency vehicle to give any vehicle sirens.", function(toggle)
     config.attach_invis_police_siren = toggle
-end, true)
+end, config.attach_invis_police_siren)
+
+menu.toggle(options_menu, "Annoying Sirens", {}, "If enabled, \"Lights Only\" mode will include vehicle sirens, but these can only be muted locally so will still annoy others online.", function(toggle)
+    config.annoying_sirens = toggle
+end, config.annoying_sirens)
 
 menu.list_select(options_menu, "Invis Siren Type", {}, "Different siren types have slightly different sounds", siren_types, 1, function(index)
     local siren_type = siren_types[index]
@@ -2158,4 +2084,3 @@ util.create_tick_handler(function()
     policify_tick()
     return true
 end)
-
