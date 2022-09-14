@@ -4,7 +4,7 @@
 -- Save and share your polcified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0b13"
+local SCRIPT_VERSION = "3.0b14"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -116,7 +116,7 @@ local policified_vehicle_base = {
         attach_invis_police_siren = config.attach_invis_police_siren,
         plate_text = config.plate_text,
         siren_attachment = config.siren_attachment,
-        sirens_status = SIRENS_OFF,
+        siren_status = SIRENS_OFF,
     },
     save_data = {
         Horn = nil,
@@ -525,7 +525,7 @@ local siren_types = {
 
 util.require_natives(1660775568)
 local json = require("json")
---local inspect = require("inspect")
+local inspect = require("inspect")
 
 function table.table_copy(obj)
     if type(obj) ~= 'table' then
@@ -1225,7 +1225,7 @@ end
 local function policify_vehicle(vehicle)
     for _, previously_policified_vehicle in pairs(policified_vehicles) do
         if previously_policified_vehicle.handle == vehicle then
-            menu.focus(previously_policified_vehicle.sirens_menu)
+            menu.focus(previously_policified_vehicle.menus.siren)
             return
         end
     end
@@ -1237,7 +1237,7 @@ local function policify_vehicle(vehicle)
     policified_vehicle.model = VEHICLE.GET_DISPLAY_NAME_FROM_VEHICLE_MODEL(policified_vehicle.hash)
     policified_vehicle.name = policified_vehicle.model
     add_overrides_to_vehicle(policified_vehicle)
-    policified_vehicle.options.siren_status = SIRENS_OFF
+    --policified_vehicle.options.siren_status = SIRENS_OFF
     refresh_siren_status(policified_vehicle)
     table.insert(policified_vehicles, policified_vehicle)
     last_policified_vehicle = policified_vehicle
@@ -1330,20 +1330,22 @@ local function serialize_vehicle_attributes(attachment)
     serialized_vehicle.dirt_level = VEHICLE.GET_VEHICLE_DIRT_LEVEL(attachment.handle)
 
     serialized_vehicle.mods = {}
-    for mod_index = 1, 48 do
-        serialized_vehicle.mods[mod_index] = VEHICLE.GET_VEHICLE_MOD(attachment.handle, mod_index)
+
+    for mod_index = 0, 49 do
+        local mod_value
+        if mod_index >= 17 and mod_index <= 22 then
+            mod_value = VEHICLE.IS_TOGGLE_MOD_ON(attachment.handle, mod_index)
+        else
+            mod_value = VEHICLE.GET_VEHICLE_MOD(attachment.handle, mod_index)
+        end
+        serialized_vehicle.mods["_"..mod_index] = mod_value
     end
 
     serialized_vehicle.extras = {}
-    for extra_index = 1, 14 do
+    for extra_index = 0, 14 do
         if VEHICLE.DOES_EXTRA_EXIST(attachment.handle, extra_index) then
-            serialized_vehicle.extras[extra_index] = VEHICLE.IS_VEHICLE_EXTRA_TURNED_ON(attachment.handle, extra_index)
+            serialized_vehicle.extras["_"..extra_index] = VEHICLE.IS_VEHICLE_EXTRA_TURNED_ON(attachment.handle, extra_index)
         end
-    end
-
-    serialized_vehicle.mod_toggles = {}
-    for mod_toggle_index = 18, 23 do
-        serialized_vehicle.mod_toggles[mod_toggle_index] = VEHICLE.IS_TOGGLE_MOD_ON(attachment.handle, mod_toggle_index - 1)
     end
 
     memory.free(color.r) memory.free(color.g) memory.free(color.b)
@@ -1353,6 +1355,8 @@ end
 local function deserialize_vehicle_attributes(attachment)
     if attachment.vehicle_attributes == nil then return end
     local serialized_vehicle = attachment.vehicle_attributes
+
+    VEHICLE.SET_VEHICLE_MOD_KIT(attachment.handle, 0)
 
     VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(attachment.handle, 0, serialized_vehicle.neon.left or false)
     VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(attachment.handle, 1, serialized_vehicle.neon.right or false)
@@ -1367,8 +1371,6 @@ local function deserialize_vehicle_attributes(attachment)
         )
     end
 
-
-    --VEHICLE.SET_VEHICLE_MOD_KIT(attachment.handle, 0)
     --VEHICLE.SET_VEHICLE_COLOUR_COMBINATION(attachment.handle, attachment.save_data.Colors["Color Combo"] or -1)
 
     if serialized_vehicle.paint.extra_colors then
@@ -1414,8 +1416,10 @@ local function deserialize_vehicle_attributes(attachment)
 
     VEHICLE.SET_VEHICLE_TYRES_CAN_BURST(attachment.handle, serialized_vehicle.bulletproof_tires or false)
     VEHICLE.SET_VEHICLE_WHEEL_TYPE(attachment.handle, serialized_vehicle.wheel_type or -1)
-    VEHICLE.SET_VEHICLE_TYRE_SMOKE_COLOR(attachment.handle, serialized_vehicle.tire_smoke_color.r or 255,
-            serialized_vehicle.tire_smoke_color.g or 255, serialized_vehicle.tire_smoke_color.b or 255)
+    if serialized_vehicle.tire_smoke_color then
+        VEHICLE.SET_VEHICLE_TYRE_SMOKE_COLOR(attachment.handle, serialized_vehicle.tire_smoke_color.r or 255,
+                serialized_vehicle.tire_smoke_color.g or 255, serialized_vehicle.tire_smoke_color.b or 255)
+    end
 
     if serialized_vehicle.siren then
         AUDIO.SET_SIREN_WITH_NO_DRIVER(attachment.handle, true)
@@ -1434,20 +1438,20 @@ local function deserialize_vehicle_attributes(attachment)
         VEHICLE.SET_VEHICLE_ENGINE_ON(attachment.handle, true, true, false)
     end
 
-    for mod_index = 1,48,1 do
-        VEHICLE.SET_VEHICLE_MOD(attachment.handle, mod_index, serialized_vehicle.mods[mod_index] or -1)
+    for mod_index = 0, 49 do
+        if mod_index >= 17 and mod_index <= 22 then
+            VEHICLE.TOGGLE_VEHICLE_MOD(attachment.handle, mod_index, serialized_vehicle.mod_toggles["_"..mod_index])
+        else
+            VEHICLE.SET_VEHICLE_MOD(attachment.handle, mod_index, serialized_vehicle.mods["_"..mod_index] or -1)
+        end
     end
 
-    for extra_index = 1, 14 do
+    for extra_index = 0, 14 do
         local state = true
-        if serialized_vehicle.extras[extra_index] ~= nil then
-            state = serialized_vehicle.extras[extra_index]
+        if serialized_vehicle.extras["_"..extra_index] ~= nil then
+            state = serialized_vehicle.extras["_"..extra_index]
         end
         VEHICLE.SET_VEHICLE_EXTRA(attachment.handle, extra_index, not state)
-    end
-
-    for mod_toggle_index = 18, 23 do
-        VEHICLE.TOGGLE_VEHICLE_MOD(attachment.handle, mod_toggle_index - 1, serialized_vehicle.mod_toggles[mod_toggle_index])
     end
 
     ENTITY.SET_ENTITY_AS_MISSION_ENTITY(attachment.handle, true, true)
@@ -1459,7 +1463,8 @@ local function serialize_attachment(attachment)
         children = {}
     }
     for k, v in pairs(attachment) do
-        if not (k == "handle" or k == "root" or k == "parent" or k == "menus" or k == "children") then
+        if not (k == "handle" or k == "root" or k == "parent" or k == "menus" or k == "children"
+                or k == "rebuild_edit_attachments_menu_function") then
             serialized_attachment[k] = v
         end
     end
@@ -1474,13 +1479,17 @@ end
 local function save_vehicle(policified_vehicle)
     local filepath = VEHICLE_STORE_DIR .. policified_vehicle.name .. ".policify.json"
     local file = io.open(filepath, "wb")
-    if not file then error("Could not write file '" .. filepath .. "'") end
+    if not file then error("Cannot write to file '" .. filepath .. "'", TOAST_ALL) end
     local content = json.encode(serialize_attachment(policified_vehicle))
+    if content == "" or (not string.starts(content, "{")) then
+        util.toast("Cannot save vehicle: Error serializing.", TOAST_ALL)
+        return
+    end
     --util.toast(content, TOAST_ALL)
     file:write(content)
     file:close()
     util.toast("Saved "..policified_vehicle.name)
-end
+    end
 
 local function spawn_vehicle_for_player(policified_vehicle, pid)
     if policified_vehicle.hash == nil then
@@ -1847,7 +1856,8 @@ local function rebuild_policified_vehicle_menu()
             --menu.divider(policified_vehicle.menu, "Remove")
             menu.action(policified_vehicle.menus.main, "Depolicify", {}, "Remove policify options and return vehicle to previous condition", function()
                 depolicify_vehicle(policified_vehicle)
-                menu.focus(menu.my_root())
+                menu.trigger_commands("luapolicify")
+                --menu.focus(menu.my_root())
             end)
         end
     end
@@ -1982,15 +1992,19 @@ local saved_vehicles_menu = menu.list(menu.my_root(), "Saved Vehicles")
 local function load_vehicle_from_file(filepath)
     local file = io.open(filepath, "r")
     if file then
-        local data = json.decode(file:read("*a"))
+        local status, data = pcall(function() return json.decode(file:read("*a")) end)
+        if not status then
+            util.toast("Invalid policify vehicle file format. "..filepath, TOAST_ALL)
+            return
+        end
         if not data.target_version then
-            util.toast("Invalid policify vehicle file format. Missing target_version. "..filepath)
+            util.toast("Invalid policify vehicle file format. Missing target_version. "..filepath, TOAST_ALL)
             return
         end
         file:close()
         return data
     else
-        error("Could not read file '" .. filepath .. "'")
+        error("Could not read file '" .. filepath .. "'", TOAST_ALL)
     end
 end
 
