@@ -1440,7 +1440,7 @@ local function deserialize_vehicle_attributes(attachment)
 
     for mod_index = 0, 49 do
         if mod_index >= 17 and mod_index <= 22 then
-            VEHICLE.TOGGLE_VEHICLE_MOD(attachment.handle, mod_index, serialized_vehicle.mod_toggles["_"..mod_index])
+            VEHICLE.TOGGLE_VEHICLE_MOD(attachment.handle, mod_index, serialized_vehicle.mods["_"..mod_index])
         else
             VEHICLE.SET_VEHICLE_MOD(attachment.handle, mod_index, serialized_vehicle.mods["_"..mod_index] or -1)
         end
@@ -2108,3 +2108,5 @@ util.create_tick_handler(function()
     policify_tick()
     return true
 end)
+
+
