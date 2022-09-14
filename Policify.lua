@@ -4,7 +4,7 @@
 -- Save and share your polcified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0b11"
+local SCRIPT_VERSION = "3.0b12"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -49,6 +49,7 @@ local config = {
     override_neon = true,
     override_plate = true,
     override_horn = true,
+    override_light_multiplier = 1,
     attach_invis_police_siren = true,
     plate_text = "FIB",
     siren_attachment = {
@@ -111,6 +112,7 @@ local policified_vehicle_base = {
         override_neon = config.override_neon,
         override_plate = config.override_plate,
         override_horn = config.override_horn,
+        override_light_multiplier = config.override_light_multiplier,
         attach_invis_police_siren = config.attach_invis_police_siren,
         plate_text = config.plate_text,
         siren_attachment = config.siren_attachment,
@@ -336,12 +338,14 @@ local available_attachments = {
                         flash_start_on = false,
                         children = {
                             {
-                                flash_model = "h4_prop_battle_lights_floorblue",
+                                model = "h4_prop_battle_lights_floorblue",
+                                flash_start_on = true,
                             }
                         }
                     },
                     {
-                        flash_model = "h4_prop_battle_lights_floorblue",
+                        model = "h4_prop_battle_lights_floorblue",
+                        flash_start_on = true,
                     }
                 }
             },
@@ -630,6 +634,7 @@ local function set_headlights(policified_vehicle)
     VEHICLE.SET_VEHICLE_LIGHTS(policified_vehicle.handle, 2)
     VEHICLE.TOGGLE_VEHICLE_MOD(policified_vehicle.handle, 22, true)
     VEHICLE.SET_VEHICLE_ENGINE_ON(policified_vehicle.handle, true, true, true)
+    VEHICLE.SET_VEHICLE_LIGHT_MULTIPLIER(policified_vehicle.handle, policified_vehicle.options.override_light_multiplier)
 end
 
 local function restore_headlights(policified_vehicle)
@@ -832,68 +837,6 @@ local function refresh_plate_text(policified_vehicle)
 end
 
 ---
---- Siren Controls
----
-
-local function activate_lights(attachment)
-    if attachment.is_light_disabled then
-        ENTITY.SET_ENTITY_LIGHTS(attachment.handle, true)
-    else
-        VEHICLE.SET_VEHICLE_SIREN(attachment.handle, true)
-        VEHICLE.SET_VEHICLE_HAS_MUTED_SIRENS(attachment.handle, true)
-        ENTITY.SET_ENTITY_LIGHTS(attachment.handle, false)
-        AUDIO._TRIGGER_SIREN(attachment.handle, true)
-        AUDIO._SET_SIREN_KEEP_ON(attachment.handle, true)
-    end
-    for _, child_attachment in pairs(attachment.children) do
-        activate_lights(child_attachment)
-    end
-end
-
-local function deactivate_lights(attachment)
-    ENTITY.SET_ENTITY_LIGHTS(attachment.handle, true)
-    AUDIO._SET_SIREN_KEEP_ON(attachment.handle, false)
-    VEHICLE.SET_VEHICLE_SIREN(attachment.handle, false)
-    for _, child_attachment in pairs(attachment.children) do
-        deactivate_lights(child_attachment)
-    end
-end
-
-local function activate_sirens(attachment)
-    if attachment.type == "VEHICLE" then
-        VEHICLE.SET_VEHICLE_HAS_MUTED_SIRENS(attachment.handle, false)
-        VEHICLE.SET_VEHICLE_SIREN(attachment.handle, true)
-        AUDIO._TRIGGER_SIREN(attachment.handle, true)
-        AUDIO._SET_SIREN_KEEP_ON(attachment.handle, true)
-    end
-    for _, child_attachment in pairs(attachment.children) do
-        activate_sirens(child_attachment)
-    end
-end
-
-local function deactivate_sirens(attachment)
-    if attachment.type == "VEHICLE" then
-        if config.annoying_sirens then
-            VEHICLE.SET_VEHICLE_HAS_MUTED_SIRENS(attachment.handle, true) -- Only works locally
-        else
-            VEHICLE.SET_VEHICLE_SIREN(attachment.handle, false) -- Networks but also turns off vehicle siren lights
-        end
-    end
-    for _, child_attachment in pairs(attachment.children) do
-        deactivate_sirens(child_attachment)
-    end
-end
-
-local function sound_blip(attachment)
-    if attachment.type == "VEHICLE" then
-        AUDIO.BLIP_SIREN(attachment.handle)
-    end
-    for _, child_attachment in pairs(attachment.children) do
-        sound_blip(child_attachment)
-    end
-end
-
----
 --- Attachment Construction
 ---
 
@@ -974,11 +917,17 @@ local function attach_attachment(attachment)
     elseif attachment.type == "PED" then
         local pos = ENTITY.GET_OFFSET_FROM_ENTITY_IN_WORLD_COORDS(attachment.parent.handle, attachment.offset.x, attachment.offset.y, attachment.offset.z)
         attachment.handle = entities.create_ped(1, attachment.hash, pos, 0.0)
-        PED.SET_PED_INTO_VEHICLE(attachment.handle, attachment.parent.handle, -1)
+        if attachment.parent.type == "VEHICLE" then
+            PED.SET_PED_INTO_VEHICLE(attachment.handle, attachment.parent.handle, -1)
+        end
     else
         local pos = ENTITY.GET_ENTITY_COORDS(attachment.root.handle)
         attachment.handle = OBJECT.CREATE_OBJECT_NO_OFFSET(attachment.hash, pos.x, pos.y, pos.z, true, true, false)
         --args.handle = entities.create_object(hash, ENTITY.GET_ENTITY_COORDS(args.root.handle))
+    end
+
+    if not attachment.handle then
+        error("Error attaching attachment. Could not create handle.")
     end
 
     STREAMING.SET_MODEL_AS_NO_LONGER_NEEDED(attachment.hash)
@@ -1033,11 +982,14 @@ local function detach_attachment(attachment)
             detach_attachment(t[i])
         end)
     end
-    if attachment ~= attachment.root then
+    if attachment.handle and attachment ~= attachment.root then
         entities.delete_by_handle(attachment.handle)
     end
-    if attachment.menu then
-        menu.delete(attachment.menu)
+    if attachment.menus then
+        for key, attachment_menu in pairs(attachment.menus) do
+            -- Sometimes these menu handles are invalid but I don't know why, so wrap them in pcall to avoid errors if delete fails
+            pcall(function() menu.delete(attachment_menu) end)
+        end
     end
 end
 
@@ -1092,55 +1044,124 @@ end
 ---
 
 local function attach_invis_siren(policified_vehicle)
+    if not policified_vehicle.options.attach_invis_police_siren then return end
     attach_attachment_with_children({
         root = policified_vehicle,
         parent = policified_vehicle,
         name = policified_vehicle.options.siren_attachment.name .. " (Siren)",
         model = policified_vehicle.options.siren_attachment.model,
         type = "VEHICLE",
-        is_visible = false,
+        is_visible = true,
         is_siren = true,
-        children={
-            {
-                name=policified_vehicle.options.siren_attachment.name .. " (Driver)",
-                model="s_m_m_pilot_01",
-                type="PED",
-                is_visible=false,
-            }
-        }
+        --children={
+        --    {
+        --        name=policified_vehicle.options.siren_attachment.name .. " (Driver)",
+        --        model="s_m_m_pilot_01",
+        --        type="PED",
+        --        is_visible=true,
+        --    }
+        --}
     })
 end
 
-local function remove_invis_sirens(policified_vehicle)
+local function detach_invis_sirens(policified_vehicle)
     array_remove(policified_vehicle.children, function(t, i, j)
-        local attachment = t[i]
-        if attachment.is_siren then
-            detach_attachment(attachment)
+        local child_attachment = t[i]
+        if child_attachment.is_siren then
+            detach_attachment(child_attachment)
             return false
         end
         return true
     end)
-    --if policified_vehicle.invis_siren_ped_handle then
-    --    entities.delete_by_handle(policified_vehicle.invis_siren_ped_handle)
-    --end
-    --detach_attachment(policified_vehicle.invis_siren)
 end
 
 local function refresh_invis_police_sirens(policified_vehicle)
-    remove_invis_sirens(policified_vehicle)
+    detach_invis_sirens(policified_vehicle)
     attach_invis_siren(policified_vehicle)
 end
 
-local function refresh_siren_light_status(policified_vehicle)
+---
+--- Siren Controls
+---
+
+local function activate_attachment_lights(attachment)
+    if attachment.is_light_disabled then
+        ENTITY.SET_ENTITY_LIGHTS(attachment.handle, true)
+    else
+        VEHICLE.SET_VEHICLE_SIREN(attachment.handle, true)
+        VEHICLE.SET_VEHICLE_HAS_MUTED_SIRENS(attachment.handle, true)
+        ENTITY.SET_ENTITY_LIGHTS(attachment.handle, false)
+        AUDIO._TRIGGER_SIREN(attachment.handle, true)
+        AUDIO._SET_SIREN_KEEP_ON(attachment.handle, true)
+    end
+    for _, child_attachment in pairs(attachment.children) do
+        activate_attachment_lights(child_attachment)
+    end
+end
+
+local function deactivate_attachment_lights(attachment)
+    ENTITY.SET_ENTITY_LIGHTS(attachment.handle, true)
+    AUDIO._SET_SIREN_KEEP_ON(attachment.handle, false)
+    VEHICLE.SET_VEHICLE_SIREN(attachment.handle, false)
+    for _, child_attachment in pairs(attachment.children) do
+        deactivate_attachment_lights(child_attachment)
+    end
+end
+
+local function activate_attachment_sirens(attachment)
+    if attachment.type == "VEHICLE" and attachment.is_siren then
+        VEHICLE.SET_VEHICLE_HAS_MUTED_SIRENS(attachment.handle, false)
+        VEHICLE.SET_VEHICLE_SIREN(attachment.handle, true)
+        AUDIO._TRIGGER_SIREN(attachment.handle, true)
+        AUDIO._SET_SIREN_KEEP_ON(attachment.handle, true)
+    end
+    for _, child_attachment in pairs(attachment.children) do
+        activate_attachment_sirens(child_attachment)
+    end
+end
+
+local function activate_vehicle_sirens(policified_vehicle)
+    -- Vehicle sirens are networked silent without a ped, but adding a ped makes them audible to others
+    for _, attachment in pairs(policified_vehicle.children) do
+        if attachment.type == "VEHICLE" and attachment.is_siren then
+            local child_attachment = attach_attachment({
+                root=policified_vehicle,
+                parent=attachment,
+                name=policified_vehicle.options.siren_attachment.name .. " (Driver)",
+                model="s_m_m_pilot_01",
+                type="PED",
+                is_visible=true,
+            })
+            table.insert(attachment.children, child_attachment)
+        end
+    end
+    activate_attachment_sirens(policified_vehicle)
+end
+
+local function deactivate_vehicle_sirens(policified_vehicle)
+    -- Once a vehicle has a ped in it with sirens on they cant be turned back off, so despawn and respawn fresh vehicle
+    refresh_invis_police_sirens(policified_vehicle)
+end
+
+local function sound_blip(attachment)
+    if attachment.type == "VEHICLE" then
+        AUDIO.BLIP_SIREN(attachment.handle)
+    end
+    for _, child_attachment in pairs(attachment.children) do
+        sound_blip(child_attachment)
+    end
+end
+
+local function refresh_siren_status(policified_vehicle)
     if policified_vehicle.options.siren_status == SIRENS_OFF then
-        deactivate_lights(policified_vehicle)
-        deactivate_sirens(policified_vehicle)
+        deactivate_attachment_lights(policified_vehicle)
+        deactivate_vehicle_sirens(policified_vehicle)
     elseif policified_vehicle.options.siren_status == SIRENS_LIGHTS_ONLY then
-        activate_lights(policified_vehicle)
-        deactivate_sirens(policified_vehicle)
+        deactivate_vehicle_sirens(policified_vehicle)
+        activate_attachment_lights(policified_vehicle)
     elseif policified_vehicle.options.siren_status == SIRENS_ALL_ON then
-        activate_lights(policified_vehicle)
-        activate_sirens(policified_vehicle)
+        activate_attachment_lights(policified_vehicle)
+        activate_vehicle_sirens(policified_vehicle)
     end
 end
 
@@ -1196,7 +1217,7 @@ local function remove_overrides_from_vehicle(policified_vehicle)
         restore_plate(policified_vehicle)
     end
     if policified_vehicle.options.attach_invis_police_siren then
-        remove_invis_sirens(policified_vehicle)
+        detach_invis_sirens(policified_vehicle)
     end
     detach_attachment(policified_vehicle)
 end
@@ -1217,7 +1238,7 @@ local function policify_vehicle(vehicle)
     policified_vehicle.name = policified_vehicle.model
     add_overrides_to_vehicle(policified_vehicle)
     policified_vehicle.options.siren_status = SIRENS_OFF
-    refresh_siren_light_status(policified_vehicle)
+    refresh_siren_status(policified_vehicle)
     table.insert(policified_vehicles, policified_vehicle)
     last_policified_vehicle = policified_vehicle
     return policified_vehicle
@@ -1228,7 +1249,8 @@ local function depolicify_vehicle(policified_vehicle)
         local loop_policified_vehicle = t[i]
         if loop_policified_vehicle.handle == policified_vehicle.handle then
             remove_overrides_from_vehicle(policified_vehicle)
-            menu.delete(policified_vehicle.menus.main)
+            -- Sometimes these menu handles are invalid but I don't know why, so wrap them in pcall to avoid errors if delete fails
+            pcall(function() menu.delete(policified_vehicle.menus.main) end)
             return false
         end
         return true
@@ -1483,7 +1505,7 @@ local function spawn_loaded_vehicle(policified_vehicle)
         child_attachment.parent = policified_vehicle
         reattach_attachment_with_children(child_attachment)
     end
-    refresh_siren_light_status(policified_vehicle)
+    refresh_siren_status(policified_vehicle)
     table.insert(policified_vehicles, policified_vehicle)
     last_policified_vehicle = policified_vehicle
 end
@@ -1507,8 +1529,8 @@ local function rebuild_add_attachments_menu(attachment)
                 child_attachment.parent = attachment
                 attach_attachment_with_children(child_attachment)
                 table.insert(attachment.children, child_attachment)
-                refresh_siren_light_status(attachment.root)
-                local newly_added_edit_menu = attachment.menus.rebuild_edit_attachments_menu(attachment.root)
+                refresh_siren_status(attachment.root)
+                local newly_added_edit_menu = attachment.rebuild_edit_attachments_menu_function(attachment.root)
                 if newly_added_edit_menu then
                     menu.focus(newly_added_edit_menu)
                 end
@@ -1526,8 +1548,8 @@ local function rebuild_add_attachments_menu(attachment)
                     model = value,
                 }
                 attach_attachment_with_children(new_attachment)
-                refresh_siren_light_status(new_attachment)
-                local newly_added_edit_menu = attachment.menus.rebuild_edit_attachments_menu(attachment)
+                refresh_siren_status(new_attachment)
+                local newly_added_edit_menu = attachment.rebuild_edit_attachments_menu_function(attachment)
                 if newly_added_edit_menu then
                     menu.focus(newly_added_edit_menu)
                 end
@@ -1543,8 +1565,8 @@ local function rebuild_add_attachments_menu(attachment)
                     type = "VEHICLE",
                 }
                 attach_attachment_with_children(new_attachment)
-                refresh_siren_light_status(new_attachment)
-                local newly_added_edit_menu = attachment.menus.rebuild_edit_attachments_menu(attachment)
+                refresh_siren_status(new_attachment)
+                local newly_added_edit_menu = attachment.rebuild_edit_attachments_menu_function(attachment)
                 if newly_added_edit_menu then
                     menu.focus(newly_added_edit_menu)
                 end
@@ -1564,25 +1586,27 @@ local function rebuild_add_attachments_menu(attachment)
             rotation = table.table_copy(attachment.rotation),
         }
         attach_attachment_with_children(new_attachment)
-        refresh_siren_light_status(new_attachment)
-        local newly_added_edit_menu = attachment.menus.rebuild_edit_attachments_menu(attachment.root)
+        refresh_siren_status(new_attachment)
+        local newly_added_edit_menu = attachment.rebuild_edit_attachments_menu_function(attachment.root)
         if newly_added_edit_menu then
             menu.focus(newly_added_edit_menu)
         end
     end)
 
     --menu.action(clone_menu, "Clone Reflection: Left/Right", {}, "", function()
+    --    local original_offset = table.table_copy(attachment.offset)
     --    local new_attachment = {
     --        root = attachment.root,
     --        parent = attachment.parent,
     --        name = attachment.name .. " (Reflection)",
     --        model = attachment.model,
     --        type = "VEHICLE",
-    --        offset = {x=-attachment.offset.x, y=attachment.offset.y, z=attachment.offset.z}
+    --        offset = {x=original_offset.x, y=original_offset.y, z=original_offset.z},
+    --        rotation = table.table_copy(attachment.rotation),
     --    }
     --    attach_attachment_with_children(new_attachment)
     --    refresh_siren_light_status(new_attachment)
-    --    local newly_added_edit_menu = attachment.menus.rebuild_edit_attachments_menu(attachment)
+    --    local newly_added_edit_menu = attachment.rebuild_edit_attachments_menu_function(attachment.root)
     --    if newly_added_edit_menu then
     --        menu.focus(newly_added_edit_menu)
     --    end
@@ -1651,17 +1675,26 @@ local function rebuild_edit_attachments_menu(parent_attachment)
                 update_attachment(attachment)
             end, attachment.is_light_disabled)
 
-            menu.divider(attachment.menus.main, "Actions")
-
+            menu.divider(attachment.menus.main, "Attachments")
             attachment.menus.add_attachment = menu.list(attachment.menus.main, "Add Attachment", {}, "", function()
                 rebuild_add_attachments_menu(attachment)
             end)
             attachment.menus.edit_attachments = menu.list(attachment.menus.main, "Edit Attachments", {}, "", function()
                 rebuild_edit_attachments_menu(attachment)
             end)
-            attachment.menus.rebuild_edit_attachments_menu = rebuild_edit_attachments_menu
+            attachment.rebuild_edit_attachments_menu_function = rebuild_edit_attachments_menu
+
+            menu.divider(attachment.menus.main, "Actions")
+            if attachment.type == "VEHICLE" then
+                menu.action(attachment.menus.main, "Enter Drivers Seat", {}, "", function()
+                    PED.SET_PED_INTO_VEHICLE(PLAYER.PLAYER_PED_ID(), attachment.handle, -1)
+                end)
+            end
+
+            menu.readonly(attachment.menus.main, "Handle", attachment.handle)
 
             menu.action(attachment.menus.main, "Delete", {}, "", function()
+                menu.focus(attachment.parent.menus.edit_attachments)
                 detach_attachment(attachment)
             end)
 
@@ -1701,52 +1734,8 @@ local function rebuild_policified_vehicle_menu()
                     restore_headlights(policified_vehicle)
                     restore_neon(policified_vehicle)
                 end
-                refresh_siren_light_status(policified_vehicle)
+                refresh_siren_status(policified_vehicle)
             end)
-
-            menu.divider(policified_vehicle.menus.main, "Attachments")
-            policified_vehicle.menus.add_attachment = menu.list(policified_vehicle.menus.main, "Add Attachment", {}, "", function()
-                rebuild_add_attachments_menu(policified_vehicle)
-            end)
-            policified_vehicle.menus.edit_attachments = menu.list(policified_vehicle.menus.main, "Edit Attachments", {}, "", function()
-                rebuild_edit_attachments_menu(policified_vehicle)
-            end)
-            policified_vehicle.menus.rebuild_edit_attachments_menu = rebuild_edit_attachments_menu
-            rebuild_add_attachments_menu(policified_vehicle)
-
-            --
-            --for _, category in pairs(available_attachments) do
-            --    local category_menu = menu.list(policified_vehicle.menus.add_attachments, category.name)
-            --    for _, available_attachment in pairs(category.objects) do
-            --        menu.action(category_menu, available_attachment.name, {}, "", function()
-            --            local attachment = table.table_copy(available_attachment)
-            --            attachment.root = policified_vehicle
-            --            attachment.parent = policified_vehicle
-            --            attach_attachment_with_children(attachment)
-            --            refresh_siren_light_status(policified_vehicle)
-            --            local newly_added_edit_menu = rebuild_edit_attachments_menu(policified_vehicle)
-            --            if newly_added_edit_menu then
-            --                menu.focus(newly_added_edit_menu)
-            --            end
-            --        end)
-            --    end
-            --end
-            --
-            --menu.text_input(policified_vehicle.menus.add_attachments, "Add Object by Name", {"policifyaddobject"},
-            --        "Add an in-game object by exact name. To search for objects try https://gtahash.ru/", function (value)
-            --    local attachment = {
-            --        root = policified_vehicle,
-            --        parent = policified_vehicle,
-            --        name = value,
-            --        model = value,
-            --    }
-            --    attach_attachment_with_children(attachment)
-            --    refresh_siren_light_status(policified_vehicle)
-            --    local newly_added_edit_menu = rebuild_edit_attachments_menu(policified_vehicle)
-            --    if newly_added_edit_menu then
-            --        menu.focus(newly_added_edit_menu)
-            --    end
-            --end)
 
             --menu.divider(policified_vehicle.menu, "Options")
             local options_menu = menu.list(policified_vehicle.menus.main, "Options")
@@ -1770,6 +1759,13 @@ local function rebuild_policified_vehicle_menu()
                     restore_headlights(policified_vehicle)
                 end
             end, true)
+
+            menu.slider(options_menu, "Headlight Multiplier", {}, "Multiplies the brightness of your headlights to extreme levels", 1, 100, policified_vehicle.options.override_light_multiplier, 1, function(value)
+                policified_vehicle.options.override_light_multiplier = value
+                if policified_vehicle.options.override_headlights then
+                    set_headlights(policified_vehicle)
+                end
+            end)
 
             menu.toggle(options_menu, "Override Neon", {}, "If enabled, will override vehicle neon to flash red and blue", function(toggle)
                 policified_vehicle.options.override_neon = toggle
@@ -1812,10 +1808,10 @@ local function rebuild_policified_vehicle_menu()
                 policified_vehicle.options.attach_invis_police_siren = toggle
                 if policified_vehicle.options.attach_invis_police_siren then
                     attach_invis_siren(policified_vehicle)
-                    refresh_siren_light_status(policified_vehicle)
+                    refresh_siren_status(policified_vehicle)
                     rebuild_edit_attachments_menu(policified_vehicle)
                 else
-                    remove_invis_sirens(policified_vehicle)
+                    detach_invis_sirens(policified_vehicle)
                 end
             end, true)
 
@@ -1826,9 +1822,19 @@ local function rebuild_policified_vehicle_menu()
                     model = siren_type[4]
                 }
                 refresh_invis_police_sirens(policified_vehicle)
-                refresh_siren_light_status(policified_vehicle)
+                refresh_siren_status(policified_vehicle)
                 rebuild_edit_attachments_menu(policified_vehicle)
             end)
+
+            menu.divider(policified_vehicle.menus.main, "Attachments")
+            policified_vehicle.menus.add_attachment = menu.list(policified_vehicle.menus.main, "Add Attachment", {}, "", function()
+                rebuild_add_attachments_menu(policified_vehicle)
+            end)
+            policified_vehicle.menus.edit_attachments = menu.list(policified_vehicle.menus.main, "Edit Attachments", {}, "", function()
+                rebuild_edit_attachments_menu(policified_vehicle)
+            end)
+            policified_vehicle.rebuild_edit_attachments_menu_function = rebuild_edit_attachments_menu
+            rebuild_add_attachments_menu(policified_vehicle)
 
             menu.divider(policified_vehicle.menus.main, "Actions")
             menu.action(policified_vehicle.menus.main, "Enter Drivers Seat", {}, "", function()
@@ -1842,6 +1848,7 @@ local function rebuild_policified_vehicle_menu()
             --menu.divider(policified_vehicle.menu, "Remove")
             menu.action(policified_vehicle.menus.main, "Depolicify", {}, "Remove policify options and return vehicle to previous condition", function()
                 depolicify_vehicle(policified_vehicle)
+                menu.focus(policify_vehicle_menu)
             end)
         end
     end
@@ -1880,7 +1887,7 @@ menu.list_select(menu.my_root(), "All Sirens", {}, "", { "Off", "Lights Only", "
             restore_headlights(policified_vehicle)
             restore_neon(policified_vehicle)
         end
-        refresh_siren_light_status(policified_vehicle)
+        refresh_siren_status(policified_vehicle)
     end
 end)
 
@@ -2036,6 +2043,10 @@ end, config.override_paint)
 menu.toggle(options_menu, "Override Headlights", {}, "If enabled, will override vehicle headlights to flash blue and red", function(toggle)
     config.override_headlights = toggle
 end, config.override_headlights)
+
+menu.slider(options_menu, "Headlight Multiplier", {}, "Multiplies the brightness of your headlights to extreme levels", 1, 100, config.override_light_multiplier, 1, function(value)
+    config.override_light_multiplier = value
+end)
 
 menu.toggle(options_menu, "Override Neon", {}, "If enabled, will override vehicle neon to flash red and blue", function(toggle)
     config.override_neon = toggle
