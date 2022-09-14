@@ -4,7 +4,7 @@
 -- Save and share your polcified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0b12"
+local SCRIPT_VERSION = "3.0b13"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -1051,14 +1051,14 @@ local function attach_invis_siren(policified_vehicle)
         name = policified_vehicle.options.siren_attachment.name .. " (Siren)",
         model = policified_vehicle.options.siren_attachment.model,
         type = "VEHICLE",
-        is_visible = true,
+        is_visible = false,
         is_siren = true,
         --children={
         --    {
         --        name=policified_vehicle.options.siren_attachment.name .. " (Driver)",
         --        model="s_m_m_pilot_01",
         --        type="PED",
-        --        is_visible=true,
+        --        is_visible=false,
         --    }
         --}
     })
@@ -1130,7 +1130,7 @@ local function activate_vehicle_sirens(policified_vehicle)
                 name=policified_vehicle.options.siren_attachment.name .. " (Driver)",
                 model="s_m_m_pilot_01",
                 type="PED",
-                is_visible=true,
+                is_visible=false,
             })
             table.insert(attachment.children, child_attachment)
         end
@@ -1707,7 +1707,6 @@ local function rebuild_edit_attachments_menu(parent_attachment)
     return focus
 end
 
-local policify_vehicle_menu
 local policified_vehicles_menu
 
 local function rebuild_policified_vehicle_menu()
@@ -1848,7 +1847,7 @@ local function rebuild_policified_vehicle_menu()
             --menu.divider(policified_vehicle.menu, "Remove")
             menu.action(policified_vehicle.menus.main, "Depolicify", {}, "Remove policify options and return vehicle to previous condition", function()
                 depolicify_vehicle(policified_vehicle)
-                menu.focus(policify_vehicle_menu)
+                menu.focus(menu.my_root())
             end)
         end
     end
@@ -1858,7 +1857,7 @@ end
 --- Static Menus
 ---
 
-policify_vehicle_menu = menu.action(menu.my_root(), "Policify Vehicle", { "policify" }, "Enable Policify options on current vehicle", function()
+menu.action(menu.my_root(), "Policify Vehicle", { "policify" }, "Enable Policify options on current vehicle", function()
     local vehicle = entities.get_user_vehicle_as_handle()
     if vehicle == 0 then
         util.toast("Error: Must be in a vehicle to Policify it")
