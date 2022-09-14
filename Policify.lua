@@ -4,7 +4,7 @@
 -- Save and share your polcified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0b14"
+local SCRIPT_VERSION = "3.0b15"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -1506,17 +1506,25 @@ local function spawn_vehicle_for_player(policified_vehicle, pid)
     STREAMING.SET_MODEL_AS_NO_LONGER_NEEDED(policified_vehicle.hash)
 end
 
-local function spawn_loaded_vehicle(policified_vehicle)
-    spawn_vehicle_for_player(policified_vehicle, players.user())
-    deserialize_vehicle_attributes(policified_vehicle)
-    for _, child_attachment in pairs(policified_vehicle.children) do
-        child_attachment.root = policified_vehicle
-        child_attachment.parent = policified_vehicle
+local function spawn_loaded_vehicle(loaded_vehicle)
+    --for k, v in pairs(policified_vehicle_base) do
+    --    util.toast("checking key "..k, TOAST_ALL)
+    --    if loaded_vehicle[k] == nil then
+    --        util.toast("injecting value from base for key "..k, TOAST_ALL)
+    --        loaded_vehicle[k] = v
+    --    end
+    --end
+    spawn_vehicle_for_player(loaded_vehicle, players.user())
+    deserialize_vehicle_attributes(loaded_vehicle)
+    for _, child_attachment in pairs(loaded_vehicle.children) do
+        child_attachment.root = loaded_vehicle
+        child_attachment.parent = loaded_vehicle
         reattach_attachment_with_children(child_attachment)
     end
-    refresh_siren_status(policified_vehicle)
-    table.insert(policified_vehicles, policified_vehicle)
-    last_policified_vehicle = policified_vehicle
+    policify_vehicle(loaded_vehicle)
+    refresh_siren_status(loaded_vehicle)
+    --table.insert(policified_vehicles, loaded_vehicle)
+    --last_policified_vehicle = loaded_vehicle
 end
 
 ---
@@ -1718,8 +1726,8 @@ end
 
 local policified_vehicles_menu
 
-local function rebuild_policified_vehicle_menu()
-    for _, policified_vehicle in pairs(policified_vehicles) do
+local function rebuild_policified_vehicle_menu(policified_vehicle)
+    --for _, policified_vehicle in pairs(policified_vehicles) do
         if policified_vehicle.menus == nil then
             policified_vehicle.menus = {}
             policified_vehicle.menus.main = menu.list(policified_vehicles_menu, policified_vehicle.name)
@@ -1860,7 +1868,7 @@ local function rebuild_policified_vehicle_menu()
                 --menu.focus(menu.my_root())
             end)
         end
-    end
+    --end
 end
 
 ---
@@ -1875,7 +1883,7 @@ menu.action(menu.my_root(), "Policify Vehicle", { "policify" }, "Enable Policify
     end
     local policified_vehicle = policify_vehicle(vehicle)
     if policified_vehicle then
-        rebuild_policified_vehicle_menu()
+        rebuild_policified_vehicle_menu(policified_vehicle)
         rebuild_edit_attachments_menu(policified_vehicle)
         menu.focus(policified_vehicle.menus.siren)
     end
@@ -1988,6 +1996,7 @@ policified_vehicles_menu = menu.list(menu.my_root(), "Policified Vehicles")
 ---
 
 local saved_vehicles_menu = menu.list(menu.my_root(), "Saved Vehicles")
+local saved_vehicles_menu_items = {}
 
 local function load_vehicle_from_file(filepath)
     local file = io.open(filepath, "r")
@@ -2022,16 +2031,24 @@ local function load_saved_vehicles(directory)
     return loaded_saved_vehicles
 end
 
-for _, loaded_vehicle in pairs(load_saved_vehicles(VEHICLE_STORE_DIR)) do
-    menu.action(saved_vehicles_menu, loaded_vehicle.name, {}, "", function()
-        loaded_vehicle.root = loaded_vehicle
-        spawn_loaded_vehicle(loaded_vehicle)
-        rebuild_policified_vehicle_menu()
-        rebuild_edit_attachments_menu(loaded_vehicle)
-        menu.focus(loaded_vehicle.menus.siren)
-    end)
+local function rebuild_saved_vehicles_menu()
+    for _, saved_vehicles_menu_item in pairs(saved_vehicles_menu_items) do
+        menu.delete(saved_vehicles_menu_items)
+    end
+    saved_vehicles_menu_items = {}
+    for _, loaded_vehicle in pairs(load_saved_vehicles(VEHICLE_STORE_DIR)) do
+        local saved_vehicles_menu_item = menu.action(saved_vehicles_menu, loaded_vehicle.name, {}, "", function()
+            local spawn_vehicle = table.table_copy(loaded_vehicle)
+            spawn_loaded_vehicle(spawn_vehicle)
+            rebuild_policified_vehicle_menu(spawn_vehicle)
+            rebuild_edit_attachments_menu(spawn_vehicle)
+            menu.focus(spawn_vehicle.menus.siren)
+        end)
+        table.insert(saved_vehicles_menu_items, saved_vehicles_menu_item)
+    end
 end
 
+rebuild_saved_vehicles_menu()
 
 local options_menu = menu.list(menu.my_root(), "Options")
 
@@ -2108,5 +2125,3 @@ util.create_tick_handler(function()
     policify_tick()
     return true
 end)
-
-
