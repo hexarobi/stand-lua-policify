@@ -4,7 +4,7 @@
 -- Save and share your polcified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0b15"
+local SCRIPT_VERSION = "3.0b16"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -1165,6 +1165,20 @@ local function refresh_siren_status(policified_vehicle)
     end
 end
 
+local function update_siren_status(policified_vehicle, previous_siren_status)
+    if previous_siren_status == SIRENS_OFF and policified_vehicle.options.siren_status ~= SIRENS_OFF then
+        save_headlights(policified_vehicle)
+        set_headlights(policified_vehicle)
+        save_neon(policified_vehicle)
+        set_neon(policified_vehicle)
+    end
+    if previous_siren_status ~= SIRENS_OFF and policified_vehicle.options.siren_status == SIRENS_OFF then
+        restore_headlights(policified_vehicle)
+        restore_neon(policified_vehicle)
+    end
+    refresh_siren_status(policified_vehicle)
+end
+
 ---
 --- Control Overrides
 ---
@@ -1225,6 +1239,7 @@ end
 local function policify_vehicle(vehicle)
     for _, previously_policified_vehicle in pairs(policified_vehicles) do
         if previously_policified_vehicle.handle == vehicle then
+            util.toast("Vehicle is already policified")
             menu.focus(previously_policified_vehicle.menus.siren)
             return
         end
@@ -1237,7 +1252,6 @@ local function policify_vehicle(vehicle)
     policified_vehicle.model = VEHICLE.GET_DISPLAY_NAME_FROM_VEHICLE_MODEL(policified_vehicle.hash)
     policified_vehicle.name = policified_vehicle.model
     add_overrides_to_vehicle(policified_vehicle)
-    --policified_vehicle.options.siren_status = SIRENS_OFF
     refresh_siren_status(policified_vehicle)
     table.insert(policified_vehicles, policified_vehicle)
     last_policified_vehicle = policified_vehicle
@@ -1476,6 +1490,8 @@ local function serialize_attachment(attachment)
     return serialized_attachment
 end
 
+local rebuild_saved_vehicles_menu_function
+
 local function save_vehicle(policified_vehicle)
     local filepath = VEHICLE_STORE_DIR .. policified_vehicle.name .. ".policify.json"
     local file = io.open(filepath, "wb")
@@ -1489,7 +1505,8 @@ local function save_vehicle(policified_vehicle)
     file:write(content)
     file:close()
     util.toast("Saved "..policified_vehicle.name)
-    end
+    rebuild_saved_vehicles_menu_function()
+end
 
 local function spawn_vehicle_for_player(policified_vehicle, pid)
     if policified_vehicle.hash == nil then
@@ -1507,24 +1524,19 @@ local function spawn_vehicle_for_player(policified_vehicle, pid)
 end
 
 local function spawn_loaded_vehicle(loaded_vehicle)
-    --for k, v in pairs(policified_vehicle_base) do
-    --    util.toast("checking key "..k, TOAST_ALL)
-    --    if loaded_vehicle[k] == nil then
-    --        util.toast("injecting value from base for key "..k, TOAST_ALL)
-    --        loaded_vehicle[k] = v
-    --    end
-    --end
     spawn_vehicle_for_player(loaded_vehicle, players.user())
     deserialize_vehicle_attributes(loaded_vehicle)
+    loaded_vehicle.root = loaded_vehicle
+    loaded_vehicle.parent = loaded_vehicle
     for _, child_attachment in pairs(loaded_vehicle.children) do
         child_attachment.root = loaded_vehicle
         child_attachment.parent = loaded_vehicle
         reattach_attachment_with_children(child_attachment)
     end
-    policify_vehicle(loaded_vehicle)
+    add_overrides_to_vehicle(loaded_vehicle)
     refresh_siren_status(loaded_vehicle)
-    --table.insert(policified_vehicles, loaded_vehicle)
-    --last_policified_vehicle = loaded_vehicle
+    table.insert(policified_vehicles, loaded_vehicle)
+    last_policified_vehicle = loaded_vehicle
 end
 
 ---
@@ -1734,23 +1746,14 @@ local function rebuild_policified_vehicle_menu(policified_vehicle)
 
             menu.text_input(policified_vehicle.menus.main, "Name", {"policifysetvehiclename"}, "Set name of the vehicle", function(value)
                 policified_vehicle.name = value
+                policified_vehicle.rebuild_edit_attachments_menu_function(policified_vehicle)
             end, policified_vehicle.name)
 
             policified_vehicle.menus.siren = menu.list_select(policified_vehicle.menus.main, "Sirens", {}, "", { "Off", "Lights Only", "Sirens and Lights" }, 1, function(siren_status)
                 config.siren_status = siren_status
                 local previous_siren_status = policified_vehicle.options.siren_status
                 policified_vehicle.options.siren_status = siren_status
-                if previous_siren_status == SIRENS_OFF and siren_status ~= SIRENS_OFF then
-                    save_headlights(policified_vehicle)
-                    set_headlights(policified_vehicle)
-                    save_neon(policified_vehicle)
-                    set_neon(policified_vehicle)
-                end
-                if previous_siren_status ~= SIRENS_OFF and siren_status == SIRENS_OFF then
-                    restore_headlights(policified_vehicle)
-                    restore_neon(policified_vehicle)
-                end
-                refresh_siren_status(policified_vehicle)
+                update_siren_status(policified_vehicle, previous_siren_status)
             end)
 
             --menu.divider(policified_vehicle.menu, "Options")
@@ -1861,6 +1864,13 @@ local function rebuild_policified_vehicle_menu(policified_vehicle)
                 save_vehicle(policified_vehicle)
             end)
 
+            menu.action(policified_vehicle.menus.main, "Delete", {}, "Delete vehicle and all attachments", function()
+                depolicify_vehicle(policified_vehicle)
+                entities.delete_by_handle(policified_vehicle.handle)
+                menu.trigger_commands("luapolicify")
+                --menu.focus(menu.my_root())
+            end)
+
             --menu.divider(policified_vehicle.menu, "Remove")
             menu.action(policified_vehicle.menus.main, "Depolicify", {}, "Remove policify options and return vehicle to previous condition", function()
                 depolicify_vehicle(policified_vehicle)
@@ -1889,26 +1899,16 @@ menu.action(menu.my_root(), "Policify Vehicle", { "policify" }, "Enable Policify
     end
 end)
 
-menu.list_select(menu.my_root(), "All Sirens", {}, "", { "Off", "Lights Only", "Sirens and Lights" }, 1, function(siren_status)
+menu.list_select(menu.my_root(), "All Sirens", {}, "Set siren status for ALL currently policified vehicles", { "Off", "Lights Only", "Sirens and Lights" }, 1, function(siren_status)
     config.siren_status = siren_status
     for _, policified_vehicle in pairs(policified_vehicles) do
         local previous_siren_status = policified_vehicle.options.siren_status
         policified_vehicle.options.siren_status = siren_status
-        if previous_siren_status == SIRENS_OFF and siren_status ~= SIRENS_OFF then
-            save_headlights(policified_vehicle)
-            set_headlights(policified_vehicle)
-            save_neon(policified_vehicle)
-            set_neon(policified_vehicle)
-        end
-        if previous_siren_status ~= SIRENS_OFF and siren_status == SIRENS_OFF then
-            restore_headlights(policified_vehicle)
-            restore_neon(policified_vehicle)
-        end
-        refresh_siren_status(policified_vehicle)
+        update_siren_status(policified_vehicle, previous_siren_status)
     end
 end)
 
-menu.action(menu.my_root(), "Siren Warning Blip", { "blip" }, "A quick siren blip to gain attention", function()
+menu.action(menu.my_root(), "Siren Warning Blip", { "blip" }, "A quick siren blip to gain attention (local only)", function()
     sound_blip(last_policified_vehicle)
 end)
 
@@ -1983,7 +1983,7 @@ end)
 --
 --end)
 
-menu.action(menu.my_root(), "Call for Backup", {}, "Call for backup from nearby units", function()
+menu.action(menu.my_root(), "Call for Backup", {}, "Summons a nearby police unit to your location", function()
     local incident_id = memory.alloc(8)
     MISC.CREATE_INCIDENT_WITH_ENTITY(7, PLAYER.PLAYER_PED_ID(), 3, 3, incident_id)
     AUDIO.PLAY_POLICE_REPORT("SCRIPTED_SCANNER_REPORT_PS_2A_01", 0)
@@ -2031,7 +2031,7 @@ local function load_saved_vehicles(directory)
     return loaded_saved_vehicles
 end
 
-local function rebuild_saved_vehicles_menu()
+rebuild_saved_vehicles_menu_function = function()
     for _, saved_vehicles_menu_item in pairs(saved_vehicles_menu_items) do
         menu.delete(saved_vehicles_menu_items)
     end
@@ -2048,7 +2048,7 @@ local function rebuild_saved_vehicles_menu()
     end
 end
 
-rebuild_saved_vehicles_menu()
+rebuild_saved_vehicles_menu_function()
 
 local options_menu = menu.list(menu.my_root(), "Options")
 
