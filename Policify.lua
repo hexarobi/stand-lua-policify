@@ -4,7 +4,7 @@
 -- Save and share your polcified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0b16"
+local SCRIPT_VERSION = "3.0b17"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -525,7 +525,7 @@ local siren_types = {
 
 util.require_natives(1660775568)
 local json = require("json")
-local inspect = require("inspect")
+--local inspect = require("inspect")
 
 function table.table_copy(obj)
     if type(obj) ~= 'table' then
@@ -982,15 +982,26 @@ local function detach_attachment(attachment)
             detach_attachment(t[i])
         end)
     end
-    if attachment.handle and attachment ~= attachment.root then
-        entities.delete_by_handle(attachment.handle)
-    end
-    if attachment.menus then
-        for key, attachment_menu in pairs(attachment.menus) do
-            -- Sometimes these menu handles are invalid but I don't know why, so wrap them in pcall to avoid errors if delete fails
-            pcall(function() menu.delete(attachment_menu) end)
+    array_remove(attachment.parent.children, function(t, i, j)
+        local child_attachment = t[i]
+
+        if child_attachment.handle == attachment.handle then
+
+            if child_attachment ~= child_attachment.root then
+                entities.delete_by_handle(child_attachment.handle)
+            end
+
+            if child_attachment.menus then
+                for key, attachment_menu in pairs(child_attachment.menus) do
+                -- Sometimes these menu handles are invalid but I don't know why, so wrap them in pcall to avoid errors if delete fails
+                pcall(function() menu.delete(attachment_menu) end)
+                end
+            end
+
+            return false
         end
-    end
+        return true
+    end)
 end
 
 local function build_attachment_from_parent(attachment, child_counter)
@@ -1053,14 +1064,6 @@ local function attach_invis_siren(policified_vehicle)
         type = "VEHICLE",
         is_visible = false,
         is_siren = true,
-        --children={
-        --    {
-        --        name=policified_vehicle.options.siren_attachment.name .. " (Driver)",
-        --        model="s_m_m_pilot_01",
-        --        type="PED",
-        --        is_visible=false,
-        --    }
-        --}
     })
 end
 
@@ -1209,9 +1212,7 @@ local function add_overrides_to_vehicle(policified_vehicle)
         set_plate(policified_vehicle)
     end
 
-    if policified_vehicle.options.attach_invis_police_siren then
-        attach_invis_siren(policified_vehicle)
-    end
+    refresh_invis_police_sirens(policified_vehicle)
 end
 
 local function remove_overrides_from_vehicle(policified_vehicle)
@@ -1230,9 +1231,7 @@ local function remove_overrides_from_vehicle(policified_vehicle)
     if policified_vehicle.options.override_plate then
         restore_plate(policified_vehicle)
     end
-    if policified_vehicle.options.attach_invis_police_siren then
-        detach_invis_sirens(policified_vehicle)
-    end
+    refresh_invis_police_sirens(policified_vehicle)
     detach_attachment(policified_vehicle)
 end
 
@@ -1478,7 +1477,7 @@ local function serialize_attachment(attachment)
     }
     for k, v in pairs(attachment) do
         if not (k == "handle" or k == "root" or k == "parent" or k == "menus" or k == "children"
-                or k == "rebuild_edit_attachments_menu_function") then
+                or k == "base_name" or k == "rebuild_edit_attachments_menu_function") then
             serialized_attachment[k] = v
         end
     end
@@ -1826,7 +1825,7 @@ local function rebuild_policified_vehicle_menu(policified_vehicle)
             menu.toggle(options_menu, "Enable Invis Siren", {}, "If enabled, will attach an invisible emergency vehicle to give any vehicle sirens.", function(toggle)
                 policified_vehicle.options.attach_invis_police_siren = toggle
                 if policified_vehicle.options.attach_invis_police_siren then
-                    attach_invis_siren(policified_vehicle)
+                    refresh_invis_police_sirens(policified_vehicle)
                     refresh_siren_status(policified_vehicle)
                     rebuild_edit_attachments_menu(policified_vehicle)
                 else
@@ -2033,7 +2032,7 @@ end
 
 rebuild_saved_vehicles_menu_function = function()
     for _, saved_vehicles_menu_item in pairs(saved_vehicles_menu_items) do
-        menu.delete(saved_vehicles_menu_items)
+        menu.delete(saved_vehicles_menu_item)
     end
     saved_vehicles_menu_items = {}
     for _, loaded_vehicle in pairs(load_saved_vehicles(VEHICLE_STORE_DIR)) do
