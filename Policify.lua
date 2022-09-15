@@ -4,7 +4,7 @@
 -- Save and share your polcified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0b17"
+local SCRIPT_VERSION = "3.0b18"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -525,7 +525,7 @@ local siren_types = {
 
 util.require_natives(1660775568)
 local json = require("json")
---local inspect = require("inspect")
+local inspect = require("inspect")
 
 function table.table_copy(obj)
     if type(obj) ~= 'table' then
@@ -544,9 +544,11 @@ end
 
 -- From https://stackoverflow.com/questions/12394841/safely-remove-items-from-an-array-table-while-iterating
 local function array_remove(t, fnKeep)
+    util.log(inspect(t))
     local j, n = 1, #t;
 
     for i=1,n do
+        util.log("Check n="..n.." i="..i.." j="..j)
         if (fnKeep(t, i, j)) then
             -- Move i's kept value to j's position, if it's not already there.
             if (i ~= j) then
@@ -977,11 +979,9 @@ local function move_attachment(attachment)
 end
 
 local function detach_attachment(attachment)
-    if attachment.children then
-        array_remove(attachment.children, function(t, i, j)
-            detach_attachment(t[i])
-        end)
-    end
+    array_remove(attachment.children, function(t, i, j)
+        detach_attachment(t[i])
+    end)
     array_remove(attachment.parent.children, function(t, i, j)
         local child_attachment = t[i]
 
@@ -993,8 +993,8 @@ local function detach_attachment(attachment)
 
             if child_attachment.menus then
                 for key, attachment_menu in pairs(child_attachment.menus) do
-                -- Sometimes these menu handles are invalid but I don't know why, so wrap them in pcall to avoid errors if delete fails
-                pcall(function() menu.delete(attachment_menu) end)
+                    -- Sometimes these menu handles are invalid but I don't know why, so wrap them in pcall to avoid errors if delete fails
+                    pcall(function() menu.delete(attachment_menu) end)
                 end
             end
 
@@ -1068,14 +1068,11 @@ local function attach_invis_siren(policified_vehicle)
 end
 
 local function detach_invis_sirens(policified_vehicle)
-    array_remove(policified_vehicle.children, function(t, i, j)
-        local child_attachment = t[i]
+    for _, child_attachment in policified_vehicle.children do
         if child_attachment.is_siren then
             detach_attachment(child_attachment)
-            return false
         end
-        return true
-    end)
+    end
 end
 
 local function refresh_invis_police_sirens(policified_vehicle)
@@ -1908,7 +1905,9 @@ menu.list_select(menu.my_root(), "All Sirens", {}, "Set siren status for ALL cur
 end)
 
 menu.action(menu.my_root(), "Siren Warning Blip", { "blip" }, "A quick siren blip to gain attention (local only)", function()
-    sound_blip(last_policified_vehicle)
+    if last_policified_vehicle then
+        sound_blip(last_policified_vehicle)
+    end
 end)
 
 --POLICE_REPORTS = {
