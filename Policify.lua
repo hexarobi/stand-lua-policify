@@ -4,7 +4,7 @@
 -- Save and share your polcified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0b19"
+local SCRIPT_VERSION = "3.0rc1"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updatbed less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -1743,7 +1743,7 @@ local function rebuild_edit_attachments_menu(parent_attachment)
             attachment.menus.add_attachment = menu.list(attachment.menus.main, "Add Attachment", {}, "", function()
                 rebuild_add_attachments_menu(attachment)
             end)
-            attachment.menus.edit_attachments = menu.list(attachment.menus.main, "Edit Attachments", {}, "", function()
+            attachment.menus.edit_attachments = menu.list(attachment.menus.main, "Edit Attachments ("..#attachment.children..")", {}, "", function()
                 rebuild_edit_attachments_menu(attachment)
             end)
             attachment.rebuild_edit_attachments_menu_function = rebuild_edit_attachments_menu
@@ -1772,18 +1772,20 @@ local function rebuild_edit_attachments_menu(parent_attachment)
                 end
             end)
 
+            menu.divider(attachment.menus.main, "Info")
+            menu.readonly(attachment.menus.main, "Handle", attachment.handle)
+
             menu.divider(attachment.menus.main, "Actions")
             if attachment.type == "VEHICLE" then
                 menu.action(attachment.menus.main, "Enter Drivers Seat", {}, "", function()
                     PED.SET_PED_INTO_VEHICLE(PLAYER.PLAYER_PED_ID(), attachment.handle, -1)
                 end)
             end
-
-            menu.readonly(attachment.menus.main, "Handle", attachment.handle)
-
             menu.action(attachment.menus.main, "Delete", {}, "", function()
-                menu.focus(attachment.parent.menus.edit_attachments)
-                remove_attachment_from_parent(attachment)
+                menu.show_warning(attachment.menus.main, CLICK_COMMAND, "Are you sure you want to delete this attachment? All children will also be deleted.", function()
+                    menu.focus(attachment.parent.menus.edit_attachments)
+                    remove_attachment_from_parent(attachment)
+                end)
             end)
 
         end
@@ -1908,7 +1910,7 @@ local function rebuild_policified_vehicle_menu(policified_vehicle)
             policified_vehicle.menus.add_attachment = menu.list(policified_vehicle.menus.main, "Add Attachment", {}, "", function()
                 rebuild_add_attachments_menu(policified_vehicle)
             end)
-            policified_vehicle.menus.edit_attachments = menu.list(policified_vehicle.menus.main, "Edit Attachments", {}, "", function()
+            policified_vehicle.menus.edit_attachments = menu.list(policified_vehicle.menus.main, "Edit Attachments ("..#policified_vehicle.children..")", {}, "", function()
                 rebuild_edit_attachments_menu(policified_vehicle)
             end)
             policified_vehicle.rebuild_edit_attachments_menu_function = rebuild_edit_attachments_menu
@@ -1918,24 +1920,18 @@ local function rebuild_policified_vehicle_menu(policified_vehicle)
             menu.action(policified_vehicle.menus.main, "Enter Drivers Seat", {}, "", function()
                 PED.SET_PED_INTO_VEHICLE(PLAYER.PLAYER_PED_ID(), policified_vehicle.handle, -1)
             end)
-
             menu.action(policified_vehicle.menus.main, "Save Vehicle", {}, "Save this vehicle so it can be retrieved in the future", function()
                 save_vehicle(policified_vehicle)
             end)
-
-            menu.action(policified_vehicle.menus.main, "Delete", {}, "Delete vehicle and all attachments", function()
-                depolicify_vehicle(policified_vehicle)
-                entities.delete_by_handle(policified_vehicle.handle)
-                menu.trigger_commands("luapolicify")
-                --menu.focus(menu.my_root())
+            policified_vehicle.menus.delete_vehicle = menu.action(policified_vehicle.menus.main, "Delete", {}, "Delete vehicle and all attachments", function()
+                menu.show_warning(policified_vehicle.menus.delete_vehicle, CLICK_COMMAND, "Are you sure you want to delete this vehicle? All children will also be deleted.", function()
+                    depolicify_vehicle(policified_vehicle)
+                    entities.delete_by_handle(policified_vehicle.handle)
+                    menu.trigger_commands("luapolicify")
+                    --menu.focus(menu.my_root())
+                end)
             end)
 
-            --menu.divider(policified_vehicle.menu, "Remove")
-            menu.action(policified_vehicle.menus.main, "Depolicify", {}, "Remove policify options and return vehicle to previous condition", function()
-                depolicify_vehicle(policified_vehicle)
-                menu.trigger_commands("luapolicify")
-                --menu.focus(menu.my_root())
-            end)
         end
     --end
 end
@@ -2182,3 +2178,4 @@ util.create_tick_handler(function()
     policify_tick()
     return true
 end)
+
