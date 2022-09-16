@@ -59,7 +59,6 @@ local config = {
     source_code_branch = "main",
     edit_offset_step = 1,
     edit_rotation_step = 1,
-    annoying_sirens = false,
 }
 
 local VEHICLE_STORE_DIR = filesystem.store_dir() .. 'Policify\\vehicles\\'
@@ -2159,10 +2158,6 @@ end, config.plate_text)
 menu.toggle(options_menu, "Enable Invis Siren", {}, "If enabled, will attach an invisible emergency vehicle to give any vehicle sirens.", function(toggle)
     config.attach_invis_police_siren = toggle
 end, config.attach_invis_police_siren)
-
-menu.toggle(options_menu, "Annoying Sirens", {}, "If enabled, \"Lights Only\" mode will include vehicle sirens, but these can only be muted locally so will still annoy others online.", function(toggle)
-    config.annoying_sirens = toggle
-end, config.annoying_sirens)
 
 menu.list_select(options_menu, "Invis Siren Type", {}, "Different siren types have slightly different sounds", siren_types, 1, function(index)
     local siren_type = siren_types[index]
