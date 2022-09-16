@@ -4,7 +4,7 @@
 -- Save and share your polcified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0rc4"
+local SCRIPT_VERSION = "3.0rc5"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updatbed less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -654,6 +654,12 @@ local function serialize_vehicle_paint(vehicle, serialized_vehicle)
     -- Create pointers to hold color values
     local color = { r = memory.alloc(4), g = memory.alloc(4), b = memory.alloc(4) }
 
+    VEHICLE.GET_VEHICLE_COLOR(vehicle, color.r, color.g, color.b)
+    serialized_vehicle.paint.vehicle_custom_color = { r = memory.read_int(color.r), g = memory.read_int(color.g), b = memory.read_int(color.b) }
+    VEHICLE.GET_VEHICLE_COLOURS(vehicle, color.r, color.g)
+    serialized_vehicle.paint.primary.vehicle_standard_color = memory.read_int(color.r)
+    serialized_vehicle.paint.secondary.vehicle_standard_color = memory.read_int(color.g)
+
     serialized_vehicle.paint.primary.is_custom = VEHICLE.GET_IS_VEHICLE_PRIMARY_COLOUR_CUSTOM(vehicle.handle)
     if serialized_vehicle.paint.primary.is_custom then
         VEHICLE.GET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle.handle, color.r, color.g, color.b)
@@ -661,8 +667,8 @@ local function serialize_vehicle_paint(vehicle, serialized_vehicle)
     else
         VEHICLE.GET_VEHICLE_MOD_COLOR_1(vehicle.handle, color.r, color.g, color.b)
         serialized_vehicle.paint.primary.paint_type = memory.read_int(color.r)
-        serialized_vehicle.paint.primary.color = memory.read_int(color.b)
-        serialized_vehicle.paint.primary.pearlescent_color = memory.read_int(color.g)
+        serialized_vehicle.paint.primary.color = memory.read_int(color.g)
+        serialized_vehicle.paint.primary.pearlescent_color = memory.read_int(color.b)
     end
 
     serialized_vehicle.paint.secondary.is_custom = VEHICLE.GET_IS_VEHICLE_SECONDARY_COLOUR_CUSTOM(vehicle.handle)
@@ -683,6 +689,7 @@ local function serialize_vehicle_paint(vehicle, serialized_vehicle)
     serialized_vehicle.paint.interior_color = memory.read_int(color.r)
     serialized_vehicle.paint.fade = VEHICLE.GET_VEHICLE_ENVEFF_SCALE(vehicle.handle)
     serialized_vehicle.paint.dirt_level = VEHICLE.GET_VEHICLE_DIRT_LEVEL(vehicle.handle)
+    serialized_vehicle.paint.color_combo = VEHICLE.GET_VEHICLE_COLOUR_COMBINATION(vehicle.handle)
 
     -- Livery is also part of mods, but capture it here as well for when just saving paint
     serialized_vehicle.paint.livery = VEHICLE.GET_VEHICLE_MOD(vehicle.handle, 48)
@@ -693,7 +700,24 @@ end
 local function deserialize_vehicle_paint(vehicle, serialized_vehicle)
 
     --VEHICLE.SET_VEHICLE_MOD_KIT(vehicle.handle, 0)
-    --VEHICLE.SET_VEHICLE_COLOUR_COMBINATION(vehicle.handle, attachment.save_data.Colors["Color Combo"] or -1)
+
+    VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(
+        vehicle,
+        serialized_vehicle.paint.vehicle_custom_color.r,
+        serialized_vehicle.paint.vehicle_custom_color.g,
+        serialized_vehicle.paint.vehicle_custom_color.b
+    )
+    VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(
+        vehicle,
+        serialized_vehicle.paint.vehicle_custom_color.r,
+        serialized_vehicle.paint.vehicle_custom_color.g,
+        serialized_vehicle.paint.vehicle_custom_color.b
+    )
+    VEHICLE.SET_VEHICLE_COLOURS(
+        vehicle,
+        serialized_vehicle.paint.primary.vehicle_standard_color or 0,
+        serialized_vehicle.paint.secondary.vehicle_standard_color or 0
+    )
 
     if serialized_vehicle.paint.extra_colors then
         VEHICLE.SET_VEHICLE_EXTRA_COLOURS(
@@ -740,6 +764,7 @@ local function deserialize_vehicle_paint(vehicle, serialized_vehicle)
 
     VEHICLE.SET_VEHICLE_ENVEFF_SCALE(vehicle.handle, serialized_vehicle.paint.fade or 0)
     VEHICLE.SET_VEHICLE_DIRT_LEVEL(vehicle.handle, serialized_vehicle.paint.dirt_level or 0.0)
+    VEHICLE.SET_VEHICLE_COLOUR_COMBINATION(vehicle.handle, serialized_vehicle.paint.color_combo or -1)
     VEHICLE.SET_VEHICLE_MOD(vehicle.handle, 48, serialized_vehicle.paint.livery or -1)
 end
 
@@ -1131,7 +1156,9 @@ local function detach_attachment(attachment)
         detach_attachment(child_attachment)
         return false
     end)
-    entities.delete_by_handle(attachment.handle)
+    if attachment ~= attachment.root then
+        entities.delete_by_handle(attachment.handle)
+    end
     if attachment.menus then
         for _, attachment_menu in pairs(attachment.menus) do
             -- Sometimes these menu handles are invalid but I don't know why,
@@ -1838,12 +1865,15 @@ local function rebuild_policified_vehicle_menu(policified_vehicle)
             menu.action(policified_vehicle.menus.main, "Save Vehicle", {}, "Save this vehicle so it can be retrieved in the future", function()
                 save_vehicle(policified_vehicle)
             end)
+            menu.action(policified_vehicle.menus.main, "Depolicify", {}, "Remove policification", function()
+                depolicify_vehicle(policified_vehicle)
+                menu.trigger_commands("luapolicify")
+            end)
             policified_vehicle.menus.delete_vehicle = menu.action(policified_vehicle.menus.main, "Delete", {}, "Delete vehicle and all attachments", function()
                 menu.show_warning(policified_vehicle.menus.delete_vehicle, CLICK_COMMAND, "Are you sure you want to delete this vehicle? All children will also be deleted.", function()
                     depolicify_vehicle(policified_vehicle)
                     entities.delete_by_handle(policified_vehicle.handle)
                     menu.trigger_commands("luapolicify")
-                    --menu.focus(menu.my_root())
                 end)
             end)
 
