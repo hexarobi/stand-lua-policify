@@ -4,7 +4,7 @@
 -- Save and share your polcified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0rc1"
+local SCRIPT_VERSION = "3.0rc2"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updatbed less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -513,9 +513,10 @@ local available_attachments = {
 }
 
 local siren_types = {
-    { "Police Cruiser", {}, "A slow wail", "police", },
-    { "Police Bike", {}, "A fast chirp", "policeb", },
-    { "Ambulance", {}, "A slightly different wail", "ambulance", },
+    { "Police Cruiser", {}, "The standard siren sound from a Police Cruiser", "police", },
+    { "Police Bike", {}, "The fast chirp siren sound from a Police Bike", "policeb", },
+    { "Ambulance", {}, "The siren sounds from an Ambulance", "ambulance", },
+    { "Fire Truck", {}, "The siren sounds from a Fire Truck", "firetruk", },
 }
 
 ---
@@ -2055,6 +2056,8 @@ policified_vehicles_menu = menu.list(menu.my_root(), "Policified Vehicles")
 local saved_vehicles_menu = menu.list(menu.my_root(), "Saved Vehicles")
 local saved_vehicles_menu_items = {}
 
+menu.hyperlink(saved_vehicles_menu, "Open Saved Vehicles Folder", "file:///"..filesystem.store_dir() .. 'Policify\\vehicles\\', "Open Saved Vehicles folder")
+
 local function load_vehicle_from_file(filepath)
     local file = io.open(filepath, "r")
     if file then
@@ -2172,10 +2175,10 @@ menu.list_select(script_meta_menu, "Release Branch", {}, "Switch from main to de
     auto_update_branch(AUTO_UPDATE_BRANCHES[index][1])
 end)
 menu.hyperlink(script_meta_menu, "Github Source", "https://github.com/hexarobi/stand-lua-policify", "View source files on Github")
-menu.hyperlink(script_meta_menu, "Vehicles Folder", "file:///"..filesystem.store_dir() .. 'Policify\\vehicles\\', "Open local Vehicles folder")
+menu.hyperlink(script_meta_menu, "Discord", "https://discord.gg/RF4N7cKz", "Open Discord Server")
+menu.hyperlink(script_meta_menu, "Open Saved Vehicles Folder", "file:///"..filesystem.store_dir() .. 'Policify\\vehicles\\', "Open Saved Vehicles folder")
 
 util.create_tick_handler(function()
     policify_tick()
     return true
 end)
-
