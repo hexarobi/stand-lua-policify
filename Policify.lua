@@ -4,7 +4,7 @@
 -- Save and share your polcified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0rc3"
+local SCRIPT_VERSION = "3.0rc4"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updatbed less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -16,18 +16,27 @@ local SELECTED_BRANCH_INDEX = 2
 ---
 
 local auto_update_source_url = "https://raw.githubusercontent.com/hexarobi/stand-lua-policify/main/Policify.lua"
+
+-- Auto Updater from https://github.com/hexarobi/stand-lua-auto-updater
 local status, lib = pcall(require, "auto-updater")
 if not status then
+    auto_update_complete = nil util.toast("Installing auto-updater...", TOAST_ALL)
     async_http.init("raw.githubusercontent.com", "/hexarobi/stand-lua-auto-updater/main/auto-updater.lua",
-            function(result, headers, status_code) local error_prefix = "Error downloading auto-updater: "
-                if status_code ~= 200 then util.toast(error_prefix..status_code) return false end
-                if not result or result == "" then util.toast(error_prefix.."Found empty file.") return false end
-                local file = io.open(filesystem.scripts_dir() .. "lib\\auto-updater.lua", "wb")
-                if file == nil then util.toast(error_prefix.."Could not open file for writing.") return false end
-                file:write(result) file:close() util.toast("Successfully installed auto-updater lib")
-            end, function() util.toast("Error downloading auto-updater lib. Update failed to download.") end)
-    async_http.dispatch() util.yield(3000) require("auto-updater")
+            function(result, headers, status_code)
+                local function parse_auto_update_result(result, headers, status_code)
+                    local error_prefix = "Error downloading auto-updater: "
+                    if status_code ~= 200 then util.toast(error_prefix..status_code, TOAST_ALL) return false end
+                    if not result or result == "" then util.toast(error_prefix.."Found empty file.", TOAST_ALL) return false end
+                    local file = io.open(filesystem.scripts_dir() .. "lib\\auto-updater.lua", "wb")
+                    if file == nil then util.toast(error_prefix.."Could not open file for writing.", TOAST_ALL) return false end
+                    file:write(result) file:close() util.toast("Successfully installed auto-updater lib", TOAST_ALL) return true
+                end
+                auto_update_complete = parse_auto_update_result(result, headers, status_code)
+            end, function() util.toast("Error downloading auto-updater lib. Update failed to download.", TOAST_ALL) end)
+    async_http.dispatch() local i = 1 while (auto_update_complete == nil and i < 10) do util.yield(250) i = i + 1 end
+    require("auto-updater")
 end
+
 local function auto_update_branch(selected_branch)
     local branch_source_url = auto_update_source_url:gsub("/main/", "/"..selected_branch.."/")
     run_auto_update({source_url=branch_source_url, script_relpath=SCRIPT_RELPATH, verify_file_begins_with="--"})
