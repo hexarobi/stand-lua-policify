@@ -4,7 +4,7 @@
 -- Save and share your polcified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0rc2"
+local SCRIPT_VERSION = "3.0rc3"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updatbed less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -64,6 +64,7 @@ local config = {
 local VEHICLE_STORE_DIR = filesystem.store_dir() .. 'Policify\\vehicles\\'
 
 local function ensure_directory_exists(path)
+    path = path:gsub("\\", "/")
     local dirpath = ""
     for dirname in path:gmatch("[^/]+") do
         dirpath = dirpath .. dirname .. "/"
@@ -614,20 +615,259 @@ local function policify_tick()
     end
 end
 
+
+---
+--- Specific Serializers
+---
+
+local function serialize_vehicle_headlights(vehicle, serialized_vehicle)
+    if serialized_vehicle.headlights == nil then serialized_vehicle.headlights = {} end
+    serialized_vehicle.headlights.headlights_color = VEHICLE._GET_VEHICLE_XENON_LIGHTS_COLOR(vehicle.handle)
+    serialized_vehicle.headlights.headlights_type = VEHICLE.IS_TOGGLE_MOD_ON(vehicle.handle, 22)
+    return serialized_vehicle
+end
+
+local function deserialize_vehicle_headlights(vehicle, serialized_vehicle)
+    util.log("deserializing "..vehicle.name)
+    --VEHICLE.SET_VEHICLE_LIGHTS(policified_vehicle.handle, 0)    -- Restore full headlight control
+    VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(vehicle.handle, serialized_vehicle.headlights.headlights_color)
+    VEHICLE.TOGGLE_VEHICLE_MOD(vehicle.handle, 22, serialized_vehicle.headlights.headlights_type or false)
+end
+
+local function serialize_vehicle_paint(vehicle, serialized_vehicle)
+    if serialized_vehicle.paint == nil then
+        serialized_vehicle.paint = {
+            primary = {},
+            secondary = {},
+        }
+    end
+
+    -- Create pointers to hold color values
+    local color = { r = memory.alloc(4), g = memory.alloc(4), b = memory.alloc(4) }
+
+    serialized_vehicle.paint.primary.is_custom = VEHICLE.GET_IS_VEHICLE_PRIMARY_COLOUR_CUSTOM(vehicle.handle)
+    if serialized_vehicle.paint.primary.is_custom then
+        VEHICLE.GET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle.handle, color.r, color.g, color.b)
+        serialized_vehicle.paint.primary.custom_color = { r = memory.read_int(color.r), b = memory.read_int(color.g), g = memory.read_int(color.b) }
+    else
+        VEHICLE.GET_VEHICLE_MOD_COLOR_1(vehicle.handle, color.r, color.g, color.b)
+        serialized_vehicle.paint.primary.paint_type = memory.read_int(color.r)
+        serialized_vehicle.paint.primary.color = memory.read_int(color.b)
+        serialized_vehicle.paint.primary.pearlescent_color = memory.read_int(color.g)
+    end
+
+    serialized_vehicle.paint.secondary.is_custom = VEHICLE.GET_IS_VEHICLE_SECONDARY_COLOUR_CUSTOM(vehicle.handle)
+    if serialized_vehicle.paint.secondary.is_custom then
+        VEHICLE.GET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle.handle, color.r, color.g, color.b)
+        serialized_vehicle.paint.secondary.custom_color = { r = memory.read_int(color.r), b = memory.read_int(color.g), g = memory.read_int(color.b) }
+    else
+        VEHICLE.GET_VEHICLE_MOD_COLOR_2(vehicle.handle, color.r, color.g)
+        serialized_vehicle.paint.secondary.paint_type = memory.read_int(color.r)
+        serialized_vehicle.paint.secondary.color = memory.read_int(color.g)
+    end
+
+    VEHICLE.GET_VEHICLE_EXTRA_COLOURS(vehicle.handle, color.r, color.g)
+    serialized_vehicle.paint.extra_colors = { pearlescent = memory.read_int(color.r), wheel = memory.read_int(color.g) }
+    VEHICLE._GET_VEHICLE_DASHBOARD_COLOR(vehicle.handle, color.r)
+    serialized_vehicle.paint.dashboard_color = memory.read_int(color.r)
+    VEHICLE._GET_VEHICLE_INTERIOR_COLOR(vehicle.handle, color.r)
+    serialized_vehicle.paint.interior_color = memory.read_int(color.r)
+    serialized_vehicle.paint.fade = VEHICLE.GET_VEHICLE_ENVEFF_SCALE(vehicle.handle)
+    serialized_vehicle.paint.dirt_level = VEHICLE.GET_VEHICLE_DIRT_LEVEL(vehicle.handle)
+
+    -- Livery is also part of mods, but capture it here as well for when just saving paint
+    serialized_vehicle.paint.livery = VEHICLE.GET_VEHICLE_MOD(vehicle.handle, 48)
+
+    memory.free(color.r) memory.free(color.g) memory.free(color.b)
+end
+
+local function deserialize_vehicle_paint(vehicle, serialized_vehicle)
+
+    --VEHICLE.SET_VEHICLE_MOD_KIT(vehicle.handle, 0)
+    --VEHICLE.SET_VEHICLE_COLOUR_COMBINATION(vehicle.handle, attachment.save_data.Colors["Color Combo"] or -1)
+
+    if serialized_vehicle.paint.extra_colors then
+        VEHICLE.SET_VEHICLE_EXTRA_COLOURS(
+                vehicle.handle,
+                serialized_vehicle.paint.extra_colors.pearlescent,
+                serialized_vehicle.paint.extra_colors.wheel
+        )
+    end
+
+    if serialized_vehicle.paint.primary.is_custom then
+        VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(
+                vehicle.handle,
+                serialized_vehicle.paint.primary.custom_color.r,
+                serialized_vehicle.paint.primary.custom_color.g,
+                serialized_vehicle.paint.primary.custom_color.b
+        )
+    else
+        VEHICLE.SET_VEHICLE_MOD_COLOR_1(
+                vehicle.handle,
+                serialized_vehicle.paint.primary.paint_type,
+                serialized_vehicle.paint.primary.color,
+                serialized_vehicle.paint.primary.pearlescent_color
+        )
+    end
+
+    if serialized_vehicle.paint.secondary.is_custom then
+        VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(
+                vehicle.handle,
+                serialized_vehicle.paint.secondary.custom_color.r,
+                serialized_vehicle.paint.secondary.custom_color.g,
+                serialized_vehicle.paint.secondary.custom_color.b
+        )
+    else
+        VEHICLE.SET_VEHICLE_MOD_COLOR_2(
+                vehicle.handle,
+                serialized_vehicle.paint.secondary.paint_type,
+                serialized_vehicle.paint.secondary.color
+        )
+    end
+
+    VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(vehicle.handle, serialized_vehicle.headlights_color)
+    VEHICLE._SET_VEHICLE_DASHBOARD_COLOR(vehicle.handle, serialized_vehicle.paint.dashboard_color or -1)
+    VEHICLE._SET_VEHICLE_INTERIOR_COLOR(vehicle.handle, serialized_vehicle.paint.interior_color or -1)
+
+    VEHICLE.SET_VEHICLE_ENVEFF_SCALE(vehicle.handle, serialized_vehicle.paint.fade or 0)
+    VEHICLE.SET_VEHICLE_DIRT_LEVEL(vehicle.handle, serialized_vehicle.paint.dirt_level or 0.0)
+    VEHICLE.SET_VEHICLE_MOD(vehicle.handle, 48, serialized_vehicle.paint.livery or -1)
+end
+
+local function serialize_vehicle_neon(vehicle, serialized_vehicle)
+    if serialized_vehicle.neon == nil then serialized_vehicle.neon = {} end
+    serialized_vehicle.neon.lights = {
+        left = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(vehicle.handle, 0),
+        right = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(vehicle.handle, 1),
+        front = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(vehicle.handle, 2),
+        back = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(vehicle.handle, 3),
+    }
+    local color = { r = memory.alloc(4), g = memory.alloc(4), b = memory.alloc(4) }
+    if (serialized_vehicle.neon.lights.left or serialized_vehicle.neon.lights.right
+            or serialized_vehicle.neon.lights.front or serialized_vehicle.neon.lights.back) then
+        VEHICLE._GET_VEHICLE_NEON_LIGHTS_COLOUR(vehicle.handle, color.r, color.g, color.b)
+        serialized_vehicle.neon.color = { r = memory.read_int(color.r), g = memory.read_int(color.g), b = memory.read_int(color.b) }
+    end
+    memory.free(color.r) memory.free(color.g) memory.free(color.b)
+end
+
+local function deserialize_vehicle_neon(vehicle, serialized_vehicle)
+    VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle.handle, 0, serialized_vehicle.neon.lights.left or false)
+    VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle.handle, 1, serialized_vehicle.neon.lights.right or false)
+    VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle.handle, 2, serialized_vehicle.neon.lights.front or false)
+    VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle.handle, 3, serialized_vehicle.neon.lights.back or false)
+    if serialized_vehicle.neon.color then
+        VEHICLE._SET_VEHICLE_NEON_LIGHTS_COLOUR(
+                vehicle.handle,
+                serialized_vehicle.neon.color.r,
+                serialized_vehicle.neon.color.g,
+                serialized_vehicle.neon.color.b
+        )
+    end
+end
+
+local function serialize_vehicle_wheels(vehicle, serialized_vehicle)
+    if serialized_vehicle.wheels == nil then serialized_vehicle.wheels = {} end
+    serialized_vehicle.wheels.type = VEHICLE.GET_VEHICLE_WHEEL_TYPE(vehicle.handle)
+    local color = { r = memory.alloc(4), g = memory.alloc(4), b = memory.alloc(4) }
+    VEHICLE.GET_VEHICLE_TYRE_SMOKE_COLOR(vehicle.handle, color.r, color.g, color.b)
+    serialized_vehicle.wheels.tire_smoke_color = { r = memory.read_int(color.r), g = memory.read_int(color.g), b = memory.read_int(color.b) }
+    memory.free(color.r) memory.free(color.g) memory.free(color.b)
+end
+
+local function deserialize_vehicle_wheels(vehicle, serialized_vehicle)
+    VEHICLE.SET_VEHICLE_TYRES_CAN_BURST(vehicle.handle, serialized_vehicle.bulletproof_tires or false)
+    VEHICLE.SET_VEHICLE_WHEEL_TYPE(vehicle.handle, serialized_vehicle.wheel_type or -1)
+    if serialized_vehicle.tire_smoke_color then
+        VEHICLE.SET_VEHICLE_TYRE_SMOKE_COLOR(vehicle.handle, serialized_vehicle.tire_smoke_color.r or 255,
+                serialized_vehicle.tire_smoke_color.g or 255, serialized_vehicle.tire_smoke_color.b or 255)
+    end
+end
+
+local function serialize_vehicle_mods(vehicle, serialized_vehicle)
+    if serialized_vehicle.mods == nil then serialized_vehicle.mods = {} end
+    for mod_index = 0, 49 do
+        local mod_value
+        if mod_index >= 17 and mod_index <= 22 then
+            mod_value = VEHICLE.IS_TOGGLE_MOD_ON(vehicle.handle, mod_index)
+        else
+            mod_value = VEHICLE.GET_VEHICLE_MOD(vehicle.handle, mod_index)
+        end
+        serialized_vehicle.mods["_"..mod_index] = mod_value
+    end
+end
+
+local function deserialize_vehicle_mods(vehicle, serialized_vehicle)
+    for mod_index = 0, 49 do
+        if mod_index >= 17 and mod_index <= 22 then
+            VEHICLE.TOGGLE_VEHICLE_MOD(vehicle.handle, mod_index, serialized_vehicle.mods["_"..mod_index])
+        else
+            VEHICLE.SET_VEHICLE_MOD(vehicle.handle, mod_index, serialized_vehicle.mods["_"..mod_index] or -1)
+        end
+    end
+end
+
+local function serialize_vehicle_extras(vehicle, serialized_vehicle)
+    if serialized_vehicle.extras == nil then serialized_vehicle.extras = {} end
+    for extra_index = 0, 14 do
+        if VEHICLE.DOES_EXTRA_EXIST(vehicle.handle, extra_index) then
+            serialized_vehicle.extras["_"..extra_index] = VEHICLE.IS_VEHICLE_EXTRA_TURNED_ON(vehicle.handle, extra_index)
+        end
+    end
+end
+
+local function deserialize_vehicle_extras(vehicle, serialized_vehicle)
+    for extra_index = 0, 14 do
+        local state = true
+        if serialized_vehicle.extras["_"..extra_index] ~= nil then
+            state = serialized_vehicle.extras["_"..extra_index]
+        end
+        VEHICLE.SET_VEHICLE_EXTRA(vehicle.handle, extra_index, not state)
+    end
+end
+
+local function serialize_vehicle_options(vehicle, serialized_vehicle)
+    if serialized_vehicle.options == nil then serialized_vehicle.options = {} end
+    serialized_vehicle.options.headlights_color = VEHICLE._GET_VEHICLE_XENON_LIGHTS_COLOR(vehicle.handle)
+    serialized_vehicle.options.bulletproof_tires = VEHICLE.GET_VEHICLE_TYRES_CAN_BURST(vehicle.handle)
+    serialized_vehicle.options.window_tint = VEHICLE.GET_VEHICLE_WINDOW_TINT(vehicle.handle)
+    serialized_vehicle.options.radio_loud = AUDIO.CAN_VEHICLE_RECEIVE_CB_RADIO(vehicle.handle)
+    serialized_vehicle.options.engine_running = VEHICLE.GET_IS_VEHICLE_ENGINE_RUNNING(vehicle.handle)
+    serialized_vehicle.options.siren = VEHICLE.IS_VEHICLE_SIREN_AUDIO_ON(vehicle.handle)
+    serialized_vehicle.options.emergency_lights = VEHICLE.IS_VEHICLE_SIREN_ON(vehicle.handle)
+    serialized_vehicle.options.search_light = VEHICLE.IS_VEHICLE_SEARCHLIGHT_ON(vehicle.handle)
+    serialized_vehicle.options.license_plate_text = VEHICLE.GET_VEHICLE_NUMBER_PLATE_TEXT(vehicle.handle)
+    serialized_vehicle.options.license_plate_type = VEHICLE.GET_VEHICLE_NUMBER_PLATE_TEXT_INDEX(vehicle.handle)
+end
+
+local function deserialize_vehicle_options(vehicle, serialized_vehicle)
+    if serialized_vehicle.options.siren then
+        AUDIO.SET_SIREN_WITH_NO_DRIVER(vehicle.handle, true)
+        VEHICLE.SET_VEHICLE_HAS_MUTED_SIRENS(vehicle.handle, false)
+        AUDIO._SET_SIREN_KEEP_ON(vehicle.handle, true)
+        AUDIO._TRIGGER_SIREN(vehicle.handle, true)
+    end
+    VEHICLE.SET_VEHICLE_SIREN(vehicle.handle, serialized_vehicle.options.emergency_lights or false)
+    VEHICLE.SET_VEHICLE_SEARCHLIGHT(vehicle.handle, serialized_vehicle.options.search_light or false, true)
+    AUDIO.SET_VEHICLE_RADIO_LOUD(vehicle.handle, serialized_vehicle.options.radio_loud or false)
+    VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT(vehicle.handle, serialized_vehicle.options.license_plate_text or "UNKNOWN")
+    VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT_INDEX(vehicle.handle, serialized_vehicle.options.license_plate_type or -1)
+
+    if serialized_vehicle.options.engine_running then
+        VEHICLE.SET_VEHICLE_ENGINE_ON(vehicle.handle, true, true, false)
+    end
+end
+
 ---
 --- Policify Overrides
 ---
 
 local function save_headlights(policified_vehicle)
-    local lights_on = memory.alloc(1)
-    local highbeams_on = memory.alloc(1)
-    VEHICLE.GET_VEHICLE_LIGHTS_STATE(policified_vehicle.handle, lights_on, highbeams_on)
-    policified_vehicle.save_data.Headlights_On = memory.read_int(lights_on)
-    policified_vehicle.save_data.Highbeams_On = memory.read_int(highbeams_on)
-    memory.free(lights_on)
-    memory.free(highbeams_on)
-    policified_vehicle.save_data.Headlights_Color = VEHICLE._GET_VEHICLE_XENON_LIGHTS_COLOR(policified_vehicle.handle)
-    policified_vehicle.save_data.Headlights_Type = VEHICLE.IS_TOGGLE_MOD_ON(policified_vehicle.handle, 22)
+    if policified_vehicle.original_vehicle == nil then policified_vehicle.original_vehicle = {} end
+    serialize_vehicle_headlights(
+        policified_vehicle,
+        policified_vehicle.original_vehicle
+    )
 end
 
 local function set_headlights(policified_vehicle)
@@ -638,37 +878,19 @@ local function set_headlights(policified_vehicle)
 end
 
 local function restore_headlights(policified_vehicle)
+    deserialize_vehicle_headlights(
+        policified_vehicle,
+        policified_vehicle.original_vehicle
+    )
     VEHICLE.SET_VEHICLE_LIGHTS(policified_vehicle.handle, 0)
-    VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(policified_vehicle.handle, policified_vehicle.save_data.Headlights_Color)
-    VEHICLE.TOGGLE_VEHICLE_MOD(policified_vehicle.handle, policified_vehicle.save_data.Headlights_Type or false)
 end
 
 local function save_neon(policified_vehicle)
-    policified_vehicle.save_data.Lights.Neon = {
-        Left = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(policified_vehicle.handle, 0),
-        Right = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(policified_vehicle.handle, 1),
-        Front = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(policified_vehicle.handle, 2),
-        Back = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(policified_vehicle.handle, 3),
-    }
-    if (policified_vehicle.save_data.Lights.Neon.Left or policified_vehicle.save_data.Lights.Neon.Right
-            or policified_vehicle.save_data.Lights.Neon.Front or policified_vehicle.save_data.Lights.Neon.Back) then
-        local Color = {
-            r = memory.alloc(4),
-            g = memory.alloc(4),
-            b = memory.alloc(4),
-        }
-        VEHICLE._GET_VEHICLE_NEON_LIGHTS_COLOUR(policified_vehicle.handle, Color.r, Color.g, Color.b)
-        policified_vehicle.save_data.Lights.Neon.Color = {
-            r = memory.read_int(Color.r),
-            g = memory.read_int(Color.g),
-            b = memory.read_int(Color.b),
-        }
-        memory.free(Color.r)
-        memory.free(Color.g)
-        memory.free(Color.b)
-    else
-        policified_vehicle.save_data.Lights.Neon.Color = nil
-    end
+    if policified_vehicle.original_vehicle == nil then policified_vehicle.original_vehicle = {} end
+    serialize_vehicle_neon(
+        policified_vehicle,
+        policified_vehicle.original_vehicle
+    )
 end
 
 local function set_neon(policified_vehicle)
@@ -679,84 +901,18 @@ local function set_neon(policified_vehicle)
 end
 
 local function restore_neon(policified_vehicle)
-    VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(policified_vehicle.handle, 0, policified_vehicle.save_data.Lights.Neon.Left or false)
-    VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(policified_vehicle.handle, 1, policified_vehicle.save_data.Lights.Neon.Right or false)
-    VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(policified_vehicle.handle, 2, policified_vehicle.save_data.Lights.Neon.Front or false)
-    VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(policified_vehicle.handle, 3, policified_vehicle.save_data.Lights.Neon.Back or false)
-    if policified_vehicle.save_data.Lights.Neon.Color then
-        VEHICLE._SET_VEHICLE_NEON_LIGHTS_COLOUR(
-                policified_vehicle.handle,
-                policified_vehicle.save_data.Lights.Neon.Color.r,
-                policified_vehicle.save_data.Lights.Neon.Color.g,
-                policified_vehicle.save_data.Lights.Neon.Color.b
-        )
-    end
+    deserialize_vehicle_neon(
+        policified_vehicle,
+        policified_vehicle.original_vehicle
+    )
 end
 
 local function save_paint(policified_vehicle)
-    local Primary = {
-        Custom = VEHICLE.GET_IS_VEHICLE_PRIMARY_COLOUR_CUSTOM(policified_vehicle.handle),
-    }
-    local Secondary = {
-        Custom = VEHICLE.GET_IS_VEHICLE_SECONDARY_COLOUR_CUSTOM(policified_vehicle.handle),
-    }
-    local Color = {
-        r = memory.alloc(4),
-        g = memory.alloc(4),
-        b = memory.alloc(4),
-    }
-
-    if Primary.Custom then
-        VEHICLE.GET_VEHICLE_CUSTOM_PRIMARY_COLOUR(policified_vehicle.handle, Color.r, Color.g, Color.b)
-        Primary["Custom Color"] = {
-            r = memory.read_int(Color.r),
-            b = memory.read_int(Color.g),
-            g = memory.read_int(Color.b)
-        }
-    else
-        VEHICLE.GET_VEHICLE_MOD_COLOR_1(policified_vehicle.handle, Color.r, Color.b, Color.g)
-        Primary["Paint Type"] = memory.read_int(Color.r)
-        Primary["Color"] = memory.read_int(Color.g)
-        Primary["Pearlescent Color"] = memory.read_int(Color.b)
-    end
-    if Secondary.Custom then
-        VEHICLE.GET_VEHICLE_CUSTOM_SECONDARY_COLOUR(policified_vehicle.handle, Color.r, Color.g, Color.b)
-        Secondary["Custom Color"] = {
-            r = memory.read_int(Color.r),
-            b = memory.read_int(Color.g),
-            g = memory.read_int(Color.b)
-        }
-    else
-        VEHICLE.GET_VEHICLE_MOD_COLOR_2(policified_vehicle.handle, Color.r, Color.b)
-        Secondary["Paint Type"] = memory.read_int(Color.r)
-        Secondary["Color"] = memory.read_int(Color.g)
-    end
-    VEHICLE.GET_VEHICLE_COLOR(policified_vehicle.handle, Color.r, Color.g, Color.b)
-    local Vehicle = {
-        r = memory.read_int(Color.r),
-        g = memory.read_int(Color.g),
-        b = memory.read_int(Color.b),
-    }
-    VEHICLE.GET_VEHICLE_EXTRA_COLOURS(policified_vehicle.handle, Color.r, Color.g)
-    local ColorExtras = {
-        pearlescent = memory.read_int(Color.r),
-        wheel = memory.read_int(Color.g),
-    }
-    VEHICLE.GET_VEHICLE_COLOURS(policified_vehicle.handle, Color.r, Color.g)
-    Vehicle["Primary"] = memory.read_int(Color.r)
-    Vehicle["Secondary"] = memory.read_int(Color.g)
-    memory.free(Color.r)
-    memory.free(Color.g)
-    memory.free(Color.b)
-    policified_vehicle.save_data.Colors = {
-        Primary = Primary,
-        Secondary = Secondary,
-        ["Color Combo"] = VEHICLE.GET_VEHICLE_COLOUR_COMBINATION(policified_vehicle.handle),
-        ["Paint Fade"] = VEHICLE.GET_VEHICLE_ENVEFF_SCALE(policified_vehicle.handle),
-        Vehicle = Vehicle,
-        Extras = ColorExtras
-    }
-    policified_vehicle.save_data.Livery.style = VEHICLE.GET_VEHICLE_MOD(policified_vehicle.handle, 48)
+    if policified_vehicle.original_vehicle == nil then policified_vehicle.original_vehicle = {} end
+    serialize_vehicle_paint(
+        policified_vehicle,
+        policified_vehicle.original_vehicle
+    )
 end
 
 local function set_paint(policified_vehicle)
@@ -771,31 +927,15 @@ local function set_paint(policified_vehicle)
 end
 
 local function restore_paint(policified_vehicle)
-    VEHICLE.SET_VEHICLE_MOD_KIT(policified_vehicle.handle, 0)
-    VEHICLE.SET_VEHICLE_COLOUR_COMBINATION(policified_vehicle.handle, policified_vehicle.save_data.Colors["Color Combo"] or -1)
-    if policified_vehicle.save_data.Colors.Extra then
-        VEHICLE.SET_VEHICLE_EXTRA_COLOURS(policified_vehicle.handle, policified_vehicle.save_data.Colors.Extras.pearlescent, policified_vehicle.save_data.Colors.Extras.wheel)
-    end
-    VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(policified_vehicle.handle, policified_vehicle.save_data.Colors.Vehicle.r, policified_vehicle.save_data.Colors.Vehicle.g, policified_vehicle.save_data.Colors.Vehicle.b)
-    VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(policified_vehicle.handle, policified_vehicle.save_data.Colors.Vehicle.r, policified_vehicle.save_data.Colors.Vehicle.g, policified_vehicle.save_data.Colors.Vehicle.b)
-    VEHICLE.SET_VEHICLE_COLOURS(policified_vehicle.handle, policified_vehicle.save_data.Colors.Vehicle.Primary or 0, policified_vehicle.save_data.Colors.Vehicle.Secondary or 0)
-    if policified_vehicle.save_data.Colors.Primary.Custom and policified_vehicle.save_data.Colors.Primary["Custom Color"] then
-        VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(policified_vehicle.handle, policified_vehicle.save_data.Colors.Primary["Custom Color"].r, policified_vehicle.save_data.Colors.Primary["Custom Color"].b, policified_vehicle.save_data.Colors.Primary["Custom Color"].g)
-    else
-        VEHICLE.SET_VEHICLE_MOD_COLOR_1(policified_vehicle.handle, policified_vehicle.save_data.Colors.Primary["Paint Type"], policified_vehicle.save_data.Colors.Primary.Color, policified_vehicle.save_data.Colors.Primary["Pearlescent Color"])
-    end
-    if policified_vehicle.save_data.Colors.Secondary.Custom and policified_vehicle.save_data.Colors.Secondary["Custom Color"] then
-        VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(policified_vehicle.handle, policified_vehicle.save_data.Colors.Secondary["Custom Color"].r, policified_vehicle.save_data.Colors.Secondary["Custom Color"].b, policified_vehicle.save_data.Colors.Secondary["Custom Color"].g)
-    else
-        VEHICLE.SET_VEHICLE_MOD_COLOR_2(policified_vehicle.handle, policified_vehicle.save_data.Colors.Secondary["Paint Type"], policified_vehicle.save_data.Colors.Secondary.Color)
-    end
-    VEHICLE.SET_VEHICLE_ENVEFF_SCALE(policified_vehicle.handle, policified_vehicle.save_data["Colors"]["Paint Fade"] or 0)
-
-    VEHICLE.SET_VEHICLE_MOD(policified_vehicle.handle, 48, policified_vehicle.save_data.Livery.style or -1)
+    deserialize_vehicle_paint(
+        policified_vehicle,
+        policified_vehicle.original_vehicle
+    )
 end
 
 local function save_horn(policified_vehicle)
-    policified_vehicle.save_data.Horn = VEHICLE.GET_VEHICLE_MOD(policified_vehicle.handle, 14)
+    if policified_vehicle.original_vehicle == nil then policified_vehicle.original_vehicle = {} end
+    policified_vehicle.original_vehicle.horn = VEHICLE.GET_VEHICLE_MOD(policified_vehicle.handle, 14)
     VEHICLE.SET_VEHICLE_SIREN(policified_vehicle.handle, true)
 end
 
@@ -804,15 +944,15 @@ local function set_horn(policified_vehicle)
 end
 
 local function restore_horn(policified_vehicle)
-    VEHICLE.SET_VEHICLE_MOD(policified_vehicle.handle, 14, policified_vehicle.save_data.Horn)
+    VEHICLE.SET_VEHICLE_MOD(policified_vehicle.handle, 14, policified_vehicle.original_vehicle.horn)
     VEHICLE.SET_VEHICLE_SIREN(policified_vehicle.handle, false)
 end
 
 local function save_plate(policified_vehicle)
-    policified_vehicle.save_data["License Plate"] = {
-        Text = VEHICLE.GET_VEHICLE_NUMBER_PLATE_TEXT(policified_vehicle.handle),
-        Type = VEHICLE.GET_VEHICLE_NUMBER_PLATE_TEXT_INDEX(policified_vehicle.handle)
-    }
+    if policified_vehicle.original_vehicle == nil then policified_vehicle.original_vehicle = {} end
+    if policified_vehicle.original_vehicle.options == nil then policified_vehicle.original_vehicle.options = {} end
+    policified_vehicle.original_vehicle.options.license_plate_text = VEHICLE.GET_VEHICLE_NUMBER_PLATE_TEXT(policified_vehicle.handle)
+    policified_vehicle.original_vehicle.options.license_plate_type = VEHICLE.GET_VEHICLE_NUMBER_PLATE_TEXT_INDEX(policified_vehicle.handle)
 end
 
 local function set_plate(policified_vehicle)
@@ -824,8 +964,8 @@ end
 
 local function restore_plate(policified_vehicle)
     ENTITY.SET_ENTITY_AS_MISSION_ENTITY(policified_vehicle.handle, true, true)
-    VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT(policified_vehicle.handle, policified_vehicle.save_data["License Plate"].Text)
-    VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT_INDEX(policified_vehicle.handle, policified_vehicle.save_data["License Plate"].Type)
+    VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT(policified_vehicle.handle, policified_vehicle.original_vehicle.options.license_plate_text)
+    VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT_INDEX(policified_vehicle.handle, policified_vehicle.original_vehicle.options.license_plate_type)
 end
 
 local function refresh_plate_text(policified_vehicle)
@@ -1280,241 +1420,6 @@ local function depolicify_vehicle(policified_vehicle)
     end)
 end
 
----
---- Specific Serializers
-
-local function serialize_vehicle_headlights(vehicle, serialized_vehicle)
-    if serialized_vehicle.headlights == nil then serialized_vehicle.headlights = {} end
-    serialized_vehicle.headlights.headlights_color = VEHICLE._GET_VEHICLE_XENON_LIGHTS_COLOR(vehicle.handle)
-    serialized_vehicle.headlights.headlights_type = VEHICLE.IS_TOGGLE_MOD_ON(vehicle.handle, 22)
-    return serialized_vehicle
-end
-
-local function deserialize_vehicle_headlights(vehicle, serialized_vehicle)
-    --VEHICLE.SET_VEHICLE_LIGHTS(policified_vehicle.handle, 0)    -- Restore full headlight control
-    VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(vehicle.handle, serialized_vehicle.headlights.headlights_color)
-    VEHICLE.TOGGLE_VEHICLE_MOD(vehicle.handle, 22, serialized_vehicle.headlights.headlights_type or false)
-end
-
-local function serialize_vehicle_paint(vehicle, serialized_vehicle)
-    if serialized_vehicle.paint == nil then
-        serialized_vehicle.paint = {
-            primary = {},
-            secondary = {},
-        }
-    end
-
-    -- Create pointers to hold color values
-    local color = { r = memory.alloc(4), g = memory.alloc(4), b = memory.alloc(4) }
-
-    serialized_vehicle.paint.primary.is_custom = VEHICLE.GET_IS_VEHICLE_PRIMARY_COLOUR_CUSTOM(vehicle.handle)
-    if serialized_vehicle.paint.primary.is_custom then
-        VEHICLE.GET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle.handle, color.r, color.g, color.b)
-        serialized_vehicle.paint.primary.custom_color = { r = memory.read_int(color.r), b = memory.read_int(color.g), g = memory.read_int(color.b) }
-    else
-        VEHICLE.GET_VEHICLE_MOD_COLOR_1(vehicle.handle, color.r, color.g, color.b)
-        serialized_vehicle.paint.primary.paint_type = memory.read_int(color.r)
-        serialized_vehicle.paint.primary.color = memory.read_int(color.b)
-        serialized_vehicle.paint.primary.pearlescent_color = memory.read_int(color.g)
-    end
-
-    serialized_vehicle.paint.secondary.is_custom = VEHICLE.GET_IS_VEHICLE_SECONDARY_COLOUR_CUSTOM(vehicle.handle)
-    if serialized_vehicle.paint.secondary.is_custom then
-        VEHICLE.GET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle.handle, color.r, color.g, color.b)
-        serialized_vehicle.paint.secondary.custom_color = { r = memory.read_int(color.r), b = memory.read_int(color.g), g = memory.read_int(color.b) }
-    else
-        VEHICLE.GET_VEHICLE_MOD_COLOR_2(vehicle.handle, color.r, color.g)
-        serialized_vehicle.paint.secondary.paint_type = memory.read_int(color.r)
-        serialized_vehicle.paint.secondary.color = memory.read_int(color.g)
-    end
-
-    VEHICLE.GET_VEHICLE_EXTRA_COLOURS(vehicle.handle, color.r, color.g)
-    serialized_vehicle.paint.extra_colors = { pearlescent = memory.read_int(color.r), wheel = memory.read_int(color.g) }
-    VEHICLE._GET_VEHICLE_DASHBOARD_COLOR(vehicle.handle, color.r)
-    serialized_vehicle.paint.dashboard_color = memory.read_int(color.r)
-    VEHICLE._GET_VEHICLE_INTERIOR_COLOR(vehicle.handle, color.r)
-    serialized_vehicle.paint.interior_color = memory.read_int(color.r)
-    serialized_vehicle.paint.fade = VEHICLE.GET_VEHICLE_ENVEFF_SCALE(vehicle.handle)
-    serialized_vehicle.paint.dirt_level = VEHICLE.GET_VEHICLE_DIRT_LEVEL(vehicle.handle)
-
-    memory.free(color.r) memory.free(color.g) memory.free(color.b)
-end
-
-local function deserialize_vehicle_paint(vehicle, serialized_vehicle)
-
-    --VEHICLE.SET_VEHICLE_COLOUR_COMBINATION(vehicle.handle, attachment.save_data.Colors["Color Combo"] or -1)
-
-    if serialized_vehicle.paint.extra_colors then
-        VEHICLE.SET_VEHICLE_EXTRA_COLOURS(
-                vehicle.handle,
-                serialized_vehicle.paint.extra_colors.pearlescent,
-                serialized_vehicle.paint.extra_colors.wheel
-        )
-    end
-
-    if serialized_vehicle.paint.primary.is_custom then
-        VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(
-                vehicle.handle,
-                serialized_vehicle.paint.primary.custom_color.r,
-                serialized_vehicle.paint.primary.custom_color.g,
-                serialized_vehicle.paint.primary.custom_color.b
-        )
-    else
-        VEHICLE.SET_VEHICLE_MOD_COLOR_1(
-                vehicle.handle,
-                serialized_vehicle.paint.primary.paint_type,
-                serialized_vehicle.paint.primary.color,
-                serialized_vehicle.paint.primary.pearlescent_color
-        )
-    end
-
-    if serialized_vehicle.paint.secondary.is_custom then
-        VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(
-                vehicle.handle,
-                serialized_vehicle.paint.secondary.custom_color.r,
-                serialized_vehicle.paint.secondary.custom_color.g,
-                serialized_vehicle.paint.secondary.custom_color.b
-        )
-    else
-        VEHICLE.SET_VEHICLE_MOD_COLOR_2(
-                vehicle.handle,
-                serialized_vehicle.paint.secondary.paint_type,
-                serialized_vehicle.paint.secondary.color
-        )
-    end
-
-    VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(vehicle.handle, serialized_vehicle.headlights_color)
-    VEHICLE._SET_VEHICLE_DASHBOARD_COLOR(vehicle.handle, serialized_vehicle.paint.dashboard_color or -1)
-    VEHICLE._SET_VEHICLE_INTERIOR_COLOR(vehicle.handle, serialized_vehicle.paint.interior_color or -1)
-
-    VEHICLE.SET_VEHICLE_ENVEFF_SCALE(vehicle.handle, serialized_vehicle.paint.fade or 0)
-    VEHICLE.SET_VEHICLE_DIRT_LEVEL(vehicle.handle, serialized_vehicle.paint.dirt_level or 0.0)
-
-end
-
-local function serialize_vehicle_neon(vehicle, serialized_vehicle)
-    if serialized_vehicle.neon == nil then serialized_vehicle.neon = {} end
-    serialized_vehicle.neon.lights = {
-        left = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(vehicle.handle, 0),
-        right = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(vehicle.handle, 1),
-        front = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(vehicle.handle, 2),
-        back = VEHICLE._IS_VEHICLE_NEON_LIGHT_ENABLED(vehicle.handle, 3),
-    }
-    local color = { r = memory.alloc(4), g = memory.alloc(4), b = memory.alloc(4) }
-    if (serialized_vehicle.neon.lights.left or serialized_vehicle.neon.lights.right
-            or serialized_vehicle.neon.lights.front or serialized_vehicle.neon.lights.back) then
-        VEHICLE._GET_VEHICLE_NEON_LIGHTS_COLOUR(vehicle.handle, color.r, color.g, color.b)
-        serialized_vehicle.neon.color = { r = memory.read_int(color.r), g = memory.read_int(color.g), b = memory.read_int(color.b) }
-    end
-    memory.free(color.r) memory.free(color.g) memory.free(color.b)
-end
-
-local function deserialize_vehicle_neon(vehicle, serialized_vehicle)
-    VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle.handle, 0, serialized_vehicle.neon.lights.left or false)
-    VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle.handle, 1, serialized_vehicle.neon.lights.right or false)
-    VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle.handle, 2, serialized_vehicle.neon.lights.front or false)
-    VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle.handle, 3, serialized_vehicle.neon.lights.back or false)
-    if serialized_vehicle.neon.color then
-        VEHICLE._SET_VEHICLE_NEON_LIGHTS_COLOUR(
-                vehicle.handle,
-                serialized_vehicle.neon.color.r,
-                serialized_vehicle.neon.color.g,
-                serialized_vehicle.neon.color.b
-        )
-    end
-end
-
-local function serialize_vehicle_wheels(vehicle, serialized_vehicle)
-    if serialized_vehicle.wheels == nil then serialized_vehicle.wheels = {} end
-    serialized_vehicle.wheels.type = VEHICLE.GET_VEHICLE_WHEEL_TYPE(vehicle.handle)
-    local color = { r = memory.alloc(4), g = memory.alloc(4), b = memory.alloc(4) }
-    VEHICLE.GET_VEHICLE_TYRE_SMOKE_COLOR(vehicle.handle, color.r, color.g, color.b)
-    serialized_vehicle.wheels.tire_smoke_color = { r = memory.read_int(color.r), g = memory.read_int(color.g), b = memory.read_int(color.b) }
-    memory.free(color.r) memory.free(color.g) memory.free(color.b)
-end
-
-local function deserialize_vehicle_wheels(vehicle, serialized_vehicle)
-    VEHICLE.SET_VEHICLE_TYRES_CAN_BURST(vehicle.handle, serialized_vehicle.bulletproof_tires or false)
-    VEHICLE.SET_VEHICLE_WHEEL_TYPE(vehicle.handle, serialized_vehicle.wheel_type or -1)
-    if serialized_vehicle.tire_smoke_color then
-        VEHICLE.SET_VEHICLE_TYRE_SMOKE_COLOR(vehicle.handle, serialized_vehicle.tire_smoke_color.r or 255,
-                serialized_vehicle.tire_smoke_color.g or 255, serialized_vehicle.tire_smoke_color.b or 255)
-    end
-end
-
-local function serialize_vehicle_mods(vehicle, serialized_vehicle)
-    if serialized_vehicle.mods == nil then serialized_vehicle.mods = {} end
-    for mod_index = 0, 49 do
-        local mod_value
-        if mod_index >= 17 and mod_index <= 22 then
-            mod_value = VEHICLE.IS_TOGGLE_MOD_ON(vehicle.handle, mod_index)
-        else
-            mod_value = VEHICLE.GET_VEHICLE_MOD(vehicle.handle, mod_index)
-        end
-        serialized_vehicle.mods["_"..mod_index] = mod_value
-    end
-end
-
-local function deserialize_vehicle_mods(vehicle, serialized_vehicle)
-    for mod_index = 0, 49 do
-        if mod_index >= 17 and mod_index <= 22 then
-            VEHICLE.TOGGLE_VEHICLE_MOD(vehicle.handle, mod_index, serialized_vehicle.mods["_"..mod_index])
-        else
-            VEHICLE.SET_VEHICLE_MOD(vehicle.handle, mod_index, serialized_vehicle.mods["_"..mod_index] or -1)
-        end
-    end
-end
-
-local function serialize_vehicle_extras(vehicle, serialized_vehicle)
-    if serialized_vehicle.extras == nil then serialized_vehicle.extras = {} end
-    for extra_index = 0, 14 do
-        if VEHICLE.DOES_EXTRA_EXIST(vehicle.handle, extra_index) then
-            serialized_vehicle.extras["_"..extra_index] = VEHICLE.IS_VEHICLE_EXTRA_TURNED_ON(vehicle.handle, extra_index)
-        end
-    end
-end
-
-local function deserialize_vehicle_extras(vehicle, serialized_vehicle)
-    for extra_index = 0, 14 do
-        local state = true
-        if serialized_vehicle.extras["_"..extra_index] ~= nil then
-            state = serialized_vehicle.extras["_"..extra_index]
-        end
-        VEHICLE.SET_VEHICLE_EXTRA(vehicle.handle, extra_index, not state)
-    end
-end
-
-local function serialize_vehicle_options(vehicle, serialized_vehicle)
-    if serialized_vehicle.options == nil then serialized_vehicle.options = {} end
-    serialized_vehicle.options.headlights_color = VEHICLE._GET_VEHICLE_XENON_LIGHTS_COLOR(vehicle.handle)
-    serialized_vehicle.options.bulletproof_tires = VEHICLE.GET_VEHICLE_TYRES_CAN_BURST(vehicle.handle)
-    serialized_vehicle.options.window_tint = VEHICLE.GET_VEHICLE_WINDOW_TINT(vehicle.handle)
-    serialized_vehicle.options.radio_loud = AUDIO.CAN_VEHICLE_RECEIVE_CB_RADIO(vehicle.handle)
-    serialized_vehicle.options.engine_running = VEHICLE.GET_IS_VEHICLE_ENGINE_RUNNING(vehicle.handle)
-    serialized_vehicle.options.siren = VEHICLE.IS_VEHICLE_SIREN_AUDIO_ON(vehicle.handle)
-    serialized_vehicle.options.emergency_lights = VEHICLE.IS_VEHICLE_SIREN_ON(vehicle.handle)
-    serialized_vehicle.options.search_light = VEHICLE.IS_VEHICLE_SEARCHLIGHT_ON(vehicle.handle)
-    serialized_vehicle.options.license_plate_text = VEHICLE.GET_VEHICLE_NUMBER_PLATE_TEXT(vehicle.handle)
-    serialized_vehicle.options.license_plate_type = VEHICLE.GET_VEHICLE_NUMBER_PLATE_TEXT_INDEX(vehicle.handle)
-end
-
-local function deserialize_vehicle_options(vehicle, serialized_vehicle)
-    if serialized_vehicle.options.siren then
-        AUDIO.SET_SIREN_WITH_NO_DRIVER(vehicle.handle, true)
-        VEHICLE.SET_VEHICLE_HAS_MUTED_SIRENS(vehicle.handle, false)
-        AUDIO._SET_SIREN_KEEP_ON(vehicle.handle, true)
-        AUDIO._TRIGGER_SIREN(vehicle.handle, true)
-    end
-    VEHICLE.SET_VEHICLE_SIREN(vehicle.handle, serialized_vehicle.options.emergency_lights or false)
-    VEHICLE.SET_VEHICLE_SEARCHLIGHT(vehicle.handle, serialized_vehicle.options.search_light or false, true)
-    AUDIO.SET_VEHICLE_RADIO_LOUD(vehicle.handle, serialized_vehicle.options.radio_loud or false)
-    VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT(vehicle.handle, serialized_vehicle.options.license_plate_text or "UNKNOWN")
-    VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT_INDEX(vehicle.handle, serialized_vehicle.options.license_plate_type or -1)
-
-    if serialized_vehicle.options.engine_running then
-        VEHICLE.SET_VEHICLE_ENGINE_ON(vehicle.handle, true, true, false)
-    end
-end
 ---
 --- Serializers
 ---
