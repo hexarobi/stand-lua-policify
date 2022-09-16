@@ -15,6 +15,7 @@ local SELECTED_BRANCH_INDEX = 2
 --- Auto-Updater
 ---
 
+
 local auto_update_source_url = "https://raw.githubusercontent.com/hexarobi/stand-lua-policify/main/Policify.lua"
 
 -- Auto Updater from https://github.com/hexarobi/stand-lua-auto-updater
