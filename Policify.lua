@@ -1,10 +1,10 @@
 -- Policify
 -- by Hexarobi
--- Turns any vehicle into a police vehicle, with controlable flashing lights and sirens.
--- Save and share your polcified vehicles.
+-- Turns any vehicle into a police vehicle, with controllable flashing lights and sirens.
+-- Save and share your policified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0rc5"
+local SCRIPT_VERSION = "3.0"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updatbed less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -1560,6 +1560,8 @@ end
 --- Dynamic Menus
 ---
 
+local rebuild_policified_vehicle_menu_function
+
 local function rebuild_add_attachments_menu(attachment)
     if attachment.menus.add_attachment_categories ~= nil then
         return
@@ -1628,32 +1630,32 @@ local function rebuild_edit_attachments_menu(parent_attachment)
             attachment.menus.main = menu.list(attachment.parent.menus.edit_attachments, attachment.name or "unknown")
 
             menu.divider(attachment.menus.main, "Position")
-            local first_menu = menu.slider_float(attachment.menus.main, "X: Left / Right", {}, "", -500000, 500000, math.floor(attachment.offset.x * 100), config.edit_offset_step, function(value)
+            local first_menu = menu.slider_float(attachment.menus.main, "X: Left / Right", {"polposition"..attachment.handle.."x"}, "", -500000, 500000, math.floor(attachment.offset.x * 100), config.edit_offset_step, function(value)
                 attachment.offset.x = value / 100
                 move_attachment(attachment)
             end)
             if focus == nil then
                 focus = first_menu
             end
-            menu.slider_float(attachment.menus.main, "Y: Forward / Back", {}, "", -500000, 500000, math.floor(attachment.offset.y * -100), config.edit_offset_step, function(value)
+            menu.slider_float(attachment.menus.main, "Y: Forward / Back", {"polposition"..attachment.handle.."y"}, "", -500000, 500000, math.floor(attachment.offset.y * -100), config.edit_offset_step, function(value)
                 attachment.offset.y = value / -100
                 move_attachment(attachment)
             end)
-            menu.slider_float(attachment.menus.main, "Z: Up / Down", {}, "", -500000, 500000, math.floor(attachment.offset.z * -100), config.edit_offset_step, function(value)
+            menu.slider_float(attachment.menus.main, "Z: Up / Down", {"polposition"..attachment.handle.."z"}, "", -500000, 500000, math.floor(attachment.offset.z * -100), config.edit_offset_step, function(value)
                 attachment.offset.z = value / -100
                 move_attachment(attachment)
             end)
 
             menu.divider(attachment.menus.main, "Rotation")
-            menu.slider(attachment.menus.main, "X: Pitch", {}, "", -179, 180, attachment.rotation.x, config.edit_rotation_step, function(value)
+            menu.slider(attachment.menus.main, "X: Pitch", {"polrotate"..attachment.handle.."x"}, "", -179, 180, attachment.rotation.x, config.edit_rotation_step, function(value)
                 attachment.rotation.x = value
                 move_attachment(attachment)
             end)
-            menu.slider(attachment.menus.main, "Y: Roll", {}, "", -179, 180, attachment.rotation.y, config.edit_rotation_step, function(value)
+            menu.slider(attachment.menus.main, "Y: Roll", {"polrotate"..attachment.handle.."y"}, "", -179, 180, attachment.rotation.y, config.edit_rotation_step, function(value)
                 attachment.rotation.y = value
                 move_attachment(attachment)
             end)
-            menu.slider(attachment.menus.main, "Z: Yaw", {}, "", -179, 180, attachment.rotation.z, config.edit_rotation_step, function(value)
+            menu.slider(attachment.menus.main, "Z: Yaw", {"polrotate"..attachment.handle.."z"}, "", -179, 180, attachment.rotation.z, config.edit_rotation_step, function(value)
                 attachment.rotation.z = value
                 move_attachment(attachment)
             end)
@@ -1725,8 +1727,8 @@ local function rebuild_edit_attachments_menu(parent_attachment)
             end
             menu.action(attachment.menus.main, "Delete", {}, "", function()
                 menu.show_warning(attachment.menus.main, CLICK_COMMAND, "Are you sure you want to delete this attachment? All children will also be deleted.", function()
-                    menu.focus(attachment.parent.menus.edit_attachments)
                     remove_attachment_from_parent(attachment)
+                    menu.focus(attachment.parent.menus.edit_attachments)
                 end)
             end)
 
@@ -1742,143 +1744,141 @@ end
 local policified_vehicles_menu
 
 local function rebuild_policified_vehicle_menu(policified_vehicle)
-    --for _, policified_vehicle in pairs(policified_vehicles) do
-        if policified_vehicle.menus == nil then
-            policified_vehicle.menus = {}
-            policified_vehicle.menus.main = menu.list(policified_vehicles_menu, policified_vehicle.name)
+    if policified_vehicle.menus == nil then
+        policified_vehicle.menus = {}
+        policified_vehicle.menus.main = menu.list(policified_vehicles_menu, policified_vehicle.name)
 
-            menu.text_input(policified_vehicle.menus.main, "Name", {"policifysetvehiclename"}, "Set name of the vehicle", function(value)
-                policified_vehicle.name = value
-                policified_vehicle.rebuild_edit_attachments_menu_function(policified_vehicle)
-            end, policified_vehicle.name)
+        menu.text_input(policified_vehicle.menus.main, "Name", {"policifysetvehiclename"}, "Set name of the vehicle", function(value)
+            policified_vehicle.name = value
+            policified_vehicle.rebuild_edit_attachments_menu_function(policified_vehicle)
+        end, policified_vehicle.name)
 
-            policified_vehicle.menus.siren = menu.list_select(policified_vehicle.menus.main, "Sirens", {}, "", { "Off", "Lights Only", "Sirens and Lights" }, 1, function(siren_status)
-                config.siren_status = siren_status
-                local previous_siren_status = policified_vehicle.options.siren_status
-                policified_vehicle.options.siren_status = siren_status
-                update_siren_status(policified_vehicle, previous_siren_status)
-            end)
+        policified_vehicle.menus.siren = menu.list_select(policified_vehicle.menus.main, "Sirens", {}, "", { "Off", "Lights Only", "Sirens and Lights" }, 1, function(siren_status)
+            config.siren_status = siren_status
+            local previous_siren_status = policified_vehicle.options.siren_status
+            policified_vehicle.options.siren_status = siren_status
+            update_siren_status(policified_vehicle, previous_siren_status)
+        end)
 
-            --menu.divider(policified_vehicle.menu, "Options")
-            local options_menu = menu.list(policified_vehicle.menus.main, "Options")
+        --menu.divider(policified_vehicle.menu, "Options")
+        local options_menu = menu.list(policified_vehicle.menus.main, "Options")
 
-            menu.toggle(options_menu, "Override Paint", {}, "If enabled, will override vehicle paint to matte black", function(toggle)
-                policified_vehicle.options.override_paint = toggle
-                if policified_vehicle.options.override_paint then
-                    save_paint(policified_vehicle)
-                    set_paint(policified_vehicle)
-                else
-                    restore_paint(policified_vehicle)
-                end
-            end, true)
+        menu.toggle(options_menu, "Override Paint", {}, "If enabled, will override vehicle paint to matte black", function(toggle)
+            policified_vehicle.options.override_paint = toggle
+            if policified_vehicle.options.override_paint then
+                save_paint(policified_vehicle)
+                set_paint(policified_vehicle)
+            else
+                restore_paint(policified_vehicle)
+            end
+        end, true)
 
-            menu.toggle(options_menu, "Override Headlights", {}, "If enabled, will override vehicle headlights to flash blue and red", function(toggle)
-                policified_vehicle.options.override_headlights = toggle
-                if policified_vehicle.options.override_headlights then
-                    save_headlights(policified_vehicle)
-                    set_headlights(policified_vehicle)
-                else
-                    restore_headlights(policified_vehicle)
-                end
-            end, true)
+        menu.toggle(options_menu, "Override Headlights", {}, "If enabled, will override vehicle headlights to flash blue and red", function(toggle)
+            policified_vehicle.options.override_headlights = toggle
+            if policified_vehicle.options.override_headlights then
+                save_headlights(policified_vehicle)
+                set_headlights(policified_vehicle)
+            else
+                restore_headlights(policified_vehicle)
+            end
+        end, true)
 
-            menu.slider(options_menu, "Headlight Multiplier", {}, "Multiplies the brightness of your headlights to extreme levels", 1, 100, policified_vehicle.options.override_light_multiplier, 1, function(value)
-                policified_vehicle.options.override_light_multiplier = value
-                if policified_vehicle.options.override_headlights then
-                    set_headlights(policified_vehicle)
-                end
-            end)
+        menu.slider(options_menu, "Headlight Multiplier", {}, "Multiplies the brightness of your headlights to extreme levels", 1, 100, policified_vehicle.options.override_light_multiplier, 1, function(value)
+            policified_vehicle.options.override_light_multiplier = value
+            if policified_vehicle.options.override_headlights then
+                set_headlights(policified_vehicle)
+            end
+        end)
 
-            menu.toggle(options_menu, "Override Neon", {}, "If enabled, will override vehicle neon to flash red and blue", function(toggle)
-                policified_vehicle.options.override_neon = toggle
-                if policified_vehicle.options.override_neon then
-                    save_neon(policified_vehicle)
-                    set_neon(policified_vehicle)
-                else
-                    restore_neon(policified_vehicle)
-                end
-            end, true)
+        menu.toggle(options_menu, "Override Neon", {}, "If enabled, will override vehicle neon to flash red and blue", function(toggle)
+            policified_vehicle.options.override_neon = toggle
+            if policified_vehicle.options.override_neon then
+                save_neon(policified_vehicle)
+                set_neon(policified_vehicle)
+            else
+                restore_neon(policified_vehicle)
+            end
+        end, true)
 
-            menu.toggle(options_menu, "Override Horn", {}, "If enabled, will override vehicle horn to police horn", function(toggle)
-                policified_vehicle.options.override_horn = toggle
-                if policified_vehicle.options.override_horn then
-                    save_horn(policified_vehicle)
-                    set_horn(policified_vehicle)
-                else
-                    restore_horn(policified_vehicle)
-                end
-            end, true)
+        menu.toggle(options_menu, "Override Horn", {}, "If enabled, will override vehicle horn to police horn", function(toggle)
+            policified_vehicle.options.override_horn = toggle
+            if policified_vehicle.options.override_horn then
+                save_horn(policified_vehicle)
+                set_horn(policified_vehicle)
+            else
+                restore_horn(policified_vehicle)
+            end
+        end, true)
 
-            menu.toggle(options_menu, "Override Plate", {}, "If enabled, will override vehicle plate with custom exempt plate", function(toggle)
-                policified_vehicle.options.override_plate = toggle
-                if policified_vehicle.options.override_plate then
-                    save_plate(policified_vehicle)
-                end
-                refresh_plate_text(policified_vehicle)
-            end, true)
+        menu.toggle(options_menu, "Override Plate", {}, "If enabled, will override vehicle plate with custom exempt plate", function(toggle)
+            policified_vehicle.options.override_plate = toggle
+            if policified_vehicle.options.override_plate then
+                save_plate(policified_vehicle)
+            end
+            refresh_plate_text(policified_vehicle)
+        end, true)
 
-            menu.text_input(options_menu, "Set Plate Text", {"policifysetvehicleplate"}, "Set the text for the exempt police plates", function(value)
-                policified_vehicle.options.plate_text = value
-                refresh_plate_text(policified_vehicle)
-            end, config.plate_text)
+        menu.text_input(options_menu, "Set Plate Text", {"policifysetvehicleplate"}, "Set the text for the exempt police plates", function(value)
+            policified_vehicle.options.plate_text = value
+            refresh_plate_text(policified_vehicle)
+        end, config.plate_text)
 
-            menu.toggle_loop(options_menu, "Engine Always On", {}, "If enabled, vehicle lights will stay on even when unoccupied", function()
-                VEHICLE.SET_VEHICLE_ENGINE_ON(last_policified_vehicle.handle, true, true, true)
-            end)
+        menu.toggle_loop(options_menu, "Engine Always On", {}, "If enabled, vehicle lights will stay on even when unoccupied", function()
+            VEHICLE.SET_VEHICLE_ENGINE_ON(last_policified_vehicle.handle, true, true, true)
+        end)
 
-            menu.toggle(options_menu, "Enable Invis Siren", {}, "If enabled, will attach an invisible emergency vehicle to give any vehicle sirens.", function(toggle)
-                policified_vehicle.options.attach_invis_police_siren = toggle
-                if policified_vehicle.options.attach_invis_police_siren then
-                    refresh_invis_police_sirens(policified_vehicle)
-                    refresh_siren_status(policified_vehicle)
-                    rebuild_edit_attachments_menu(policified_vehicle)
-                else
-                    detach_invis_sirens(policified_vehicle)
-                end
-            end, true)
-
-            menu.list_select(options_menu, "Invis Siren Type", {}, "Different siren types have slightly different sounds", siren_types, 1, function(index)
-                local siren_type = siren_types[index]
-                policified_vehicle.options.siren_attachment = {
-                    name = siren_type[1],
-                    model = siren_type[4]
-                }
+        menu.toggle(options_menu, "Enable Invis Siren", {}, "If enabled, will attach an invisible emergency vehicle to give any vehicle sirens.", function(toggle)
+            policified_vehicle.options.attach_invis_police_siren = toggle
+            if policified_vehicle.options.attach_invis_police_siren then
                 refresh_invis_police_sirens(policified_vehicle)
                 refresh_siren_status(policified_vehicle)
                 rebuild_edit_attachments_menu(policified_vehicle)
-            end)
+            else
+                detach_invis_sirens(policified_vehicle)
+            end
+        end, true)
 
-            menu.divider(policified_vehicle.menus.main, "Attachments")
-            policified_vehicle.menus.add_attachment = menu.list(policified_vehicle.menus.main, "Add Attachment", {}, "", function()
-                rebuild_add_attachments_menu(policified_vehicle)
-            end)
-            policified_vehicle.menus.edit_attachments = menu.list(policified_vehicle.menus.main, "Edit Attachments ("..#policified_vehicle.children..")", {}, "", function()
-                rebuild_edit_attachments_menu(policified_vehicle)
-            end)
-            policified_vehicle.rebuild_edit_attachments_menu_function = rebuild_edit_attachments_menu
+        menu.list_select(options_menu, "Invis Siren Type", {}, "Different siren types have slightly different sounds", siren_types, 1, function(index)
+            local siren_type = siren_types[index]
+            policified_vehicle.options.siren_attachment = {
+                name = siren_type[1],
+                model = siren_type[4]
+            }
+            refresh_invis_police_sirens(policified_vehicle)
+            refresh_siren_status(policified_vehicle)
+            rebuild_edit_attachments_menu(policified_vehicle)
+        end)
+
+        menu.divider(policified_vehicle.menus.main, "Attachments")
+        policified_vehicle.menus.add_attachment = menu.list(policified_vehicle.menus.main, "Add Attachment", {}, "", function()
             rebuild_add_attachments_menu(policified_vehicle)
+        end)
+        policified_vehicle.menus.edit_attachments = menu.list(policified_vehicle.menus.main, "Edit Attachments ("..#policified_vehicle.children..")", {}, "", function()
+            rebuild_edit_attachments_menu(policified_vehicle)
+        end)
+        policified_vehicle.rebuild_edit_attachments_menu_function = rebuild_edit_attachments_menu
+        rebuild_add_attachments_menu(policified_vehicle)
 
-            menu.divider(policified_vehicle.menus.main, "Actions")
-            menu.action(policified_vehicle.menus.main, "Enter Drivers Seat", {}, "", function()
-                PED.SET_PED_INTO_VEHICLE(PLAYER.PLAYER_PED_ID(), policified_vehicle.handle, -1)
-            end)
-            menu.action(policified_vehicle.menus.main, "Save Vehicle", {}, "Save this vehicle so it can be retrieved in the future", function()
-                save_vehicle(policified_vehicle)
-            end)
-            menu.action(policified_vehicle.menus.main, "Depolicify", {}, "Remove policification", function()
+        menu.divider(policified_vehicle.menus.main, "Actions")
+        menu.action(policified_vehicle.menus.main, "Enter Drivers Seat", {}, "", function()
+            PED.SET_PED_INTO_VEHICLE(PLAYER.PLAYER_PED_ID(), policified_vehicle.handle, -1)
+        end)
+        menu.action(policified_vehicle.menus.main, "Save Vehicle", {}, "Save this vehicle so it can be retrieved in the future", function()
+            save_vehicle(policified_vehicle)
+        end)
+        menu.action(policified_vehicle.menus.main, "Depolicify", {}, "Remove policification", function()
+            depolicify_vehicle(policified_vehicle)
+            menu.trigger_commands("luapolicify")
+        end)
+        policified_vehicle.menus.delete_vehicle = menu.action(policified_vehicle.menus.main, "Delete", {}, "Delete vehicle and all attachments", function()
+            menu.show_warning(policified_vehicle.menus.delete_vehicle, CLICK_COMMAND, "Are you sure you want to delete this vehicle? All children will also be deleted.", function()
                 depolicify_vehicle(policified_vehicle)
+                entities.delete_by_handle(policified_vehicle.handle)
                 menu.trigger_commands("luapolicify")
             end)
-            policified_vehicle.menus.delete_vehicle = menu.action(policified_vehicle.menus.main, "Delete", {}, "Delete vehicle and all attachments", function()
-                menu.show_warning(policified_vehicle.menus.delete_vehicle, CLICK_COMMAND, "Are you sure you want to delete this vehicle? All children will also be deleted.", function()
-                    depolicify_vehicle(policified_vehicle)
-                    entities.delete_by_handle(policified_vehicle.handle)
-                    menu.trigger_commands("luapolicify")
-                end)
-            end)
+        end)
 
-        end
-    --end
+    end
 end
 
 ---
@@ -2044,6 +2044,7 @@ rebuild_saved_vehicles_menu_function = function()
         local saved_vehicles_menu_item = menu.action(saved_vehicles_menu, loaded_vehicle.name, {}, "", function()
             local spawn_vehicle = table.table_copy(loaded_vehicle)
             spawn_loaded_vehicle(spawn_vehicle)
+
             rebuild_policified_vehicle_menu(spawn_vehicle)
             rebuild_edit_attachments_menu(spawn_vehicle)
             menu.focus(spawn_vehicle.menus.siren)
@@ -2120,7 +2121,8 @@ menu.list_select(script_meta_menu, "Release Branch", {}, "Switch from main to de
 end)
 menu.hyperlink(script_meta_menu, "Github Source", "https://github.com/hexarobi/stand-lua-policify", "View source files on Github")
 menu.hyperlink(script_meta_menu, "Discord", "https://discord.gg/RF4N7cKz", "Open Discord Server")
-menu.hyperlink(script_meta_menu, "Open Saved Vehicles Folder", "file:///"..filesystem.store_dir() .. 'Policify\\vehicles\\', "Open Saved Vehicles folder")
+menu.divider(script_meta_menu, "Credits")
+menu.readonly(script_meta_menu, "Jackz for writing Vehicle Builder", "Much of Policify is based on code from Jackz Vehicle Builder and wouldn't have been possible without this foundation")
 
 util.create_tick_handler(function()
     policify_tick()
