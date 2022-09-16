@@ -6,7 +6,7 @@
 
 local SCRIPT_VERSION = "3.0"
 local AUTO_UPDATE_BRANCHES = {
-    { "main", {}, "More stable, but updatbed less often.", "main", },
+    { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
 }
 local SELECTED_BRANCH_INDEX = 2
