@@ -4,7 +4,7 @@
 -- Save and share your policified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0.2b3"
+local SCRIPT_VERSION = "3.0.2b4"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -20,7 +20,7 @@ local auto_update_source_url = "https://raw.githubusercontent.com/hexarobi/stand
 -- Auto Updater from https://github.com/hexarobi/stand-lua-auto-updater
 local status, auto_updater = pcall(require, "auto-updater")
 if not status then
-    auto_update_complete = nil util.toast("Installing auto-updater...", TOAST_ALL)
+    local auto_update_complete = nil util.toast("Installing auto-updater...", TOAST_ALL)
     async_http.init("raw.githubusercontent.com", "/hexarobi/stand-lua-auto-updater/v1.9.1/auto-updater.lua",
             function(result, headers, status_code)
                 local function parse_auto_update_result(result, headers, status_code)
@@ -34,7 +34,8 @@ if not status then
                 end
                 auto_update_complete = parse_auto_update_result(result, headers, status_code)
             end, function() util.toast("Error downloading auto-updater lib. Update failed to download.", TOAST_ALL) end)
-    async_http.dispatch() local i = 1 while (auto_update_complete == nil and i < 10) do util.yield(250) i = i + 1 end
+    async_http.dispatch() local i = 1 while (auto_update_complete == nil and i < 20) do util.yield(250) i = i + 1 end
+    if auto_update_complete == nil then error("Error downloading auto-updater lib. HTTP Request timeout") end
     auto_updater = require("auto-updater")
 end
 
