@@ -4,7 +4,7 @@
 -- Save and share your policified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0.2b4"
+local SCRIPT_VERSION = "3.0.2b5"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -1381,12 +1381,10 @@ end
 local function add_overrides_to_vehicle(policified_vehicle)
     if policified_vehicle.options.override_headlights then
         save_headlights(policified_vehicle)
-        set_headlights(policified_vehicle)
     end
 
     if policified_vehicle.options.override_neon then
         save_neon(policified_vehicle)
-        set_neon(policified_vehicle)
     end
 
     if policified_vehicle.options.override_horn then
