@@ -4,7 +4,7 @@
 -- Save and share your policified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.1b1"
+local SCRIPT_VERSION = "3.0.2b1"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -27,6 +27,7 @@ if not status then
                     local error_prefix = "Error downloading auto-updater: "
                     if status_code ~= 200 then util.toast(error_prefix..status_code, TOAST_ALL) return false end
                     if not result or result == "" then util.toast(error_prefix.."Found empty file.", TOAST_ALL) return false end
+                    filesystem.mkdir(filesystem.scripts_dir() .. "lib")
                     local file = io.open(filesystem.scripts_dir() .. "lib\\auto-updater.lua", "wb")
                     if file == nil then util.toast(error_prefix.."Could not open file for writing.", TOAST_ALL) return false end
                     file:write(result) file:close() util.toast("Successfully installed auto-updater lib", TOAST_ALL) return true
@@ -34,7 +35,8 @@ if not status then
                 auto_update_complete = parse_auto_update_result(result, headers, status_code)
             end, function() util.toast("Error downloading auto-updater lib. Update failed to download.", TOAST_ALL) end)
     async_http.dispatch() local i = 1 while (auto_update_complete == nil and i < 10) do util.yield(250) i = i + 1 end
-    require("auto-updater")
+    local status, lib = pcall(require, "auto-updater")
+    if not status then error("Could not load auto-updater lib") end
 end
 
 local function auto_update_branch(selected_branch)
@@ -534,8 +536,14 @@ local siren_types = {
 ---
 
 util.require_natives(1660775568)
-local json = require("json")
---local inspect = require("inspect")
+local status, natives = pcall(require, "natives-1660775568")
+if not status then error("Could not natives lib. Make sure it is selected under Stand > Lua Scripts > Repository > natives-1660775568") end
+
+local status, json = pcall(require, "json")
+if not status then error("Could not load json lib. Make sure it is selected under Stand > Lua Scripts > Repository > json") end
+
+--local status, json = pcall(require, "inspect")
+--if not status then error("Could not inspect lib") end
 
 function table.table_copy(obj)
     if type(obj) ~= 'table' then
@@ -1221,9 +1229,6 @@ local function attach_attachment_with_children(new_attachment, child_counter)
             attach_attachment_with_children(child_attachment, child_counter)
         end
     end
-    --if new_attachment.parent == new_attachment.root then
-    --    table.insert(new_attachment.root.children, new_attachment)
-    --end
     return attachment
 end
 
