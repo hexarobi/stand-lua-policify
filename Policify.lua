@@ -4,7 +4,7 @@
 -- Save and share your policified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0.2b1"
+local SCRIPT_VERSION = "3.0.2b3"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -18,10 +18,10 @@ local SELECTED_BRANCH_INDEX = 2
 local auto_update_source_url = "https://raw.githubusercontent.com/hexarobi/stand-lua-policify/main/Policify.lua"
 
 -- Auto Updater from https://github.com/hexarobi/stand-lua-auto-updater
-local status, lib = pcall(require, "auto-updater")
+local status, auto_updater = pcall(require, "auto-updater")
 if not status then
     auto_update_complete = nil util.toast("Installing auto-updater...", TOAST_ALL)
-    async_http.init("raw.githubusercontent.com", "/hexarobi/stand-lua-auto-updater/main/auto-updater.lua",
+    async_http.init("raw.githubusercontent.com", "/hexarobi/stand-lua-auto-updater/v1.9.1/auto-updater.lua",
             function(result, headers, status_code)
                 local function parse_auto_update_result(result, headers, status_code)
                     local error_prefix = "Error downloading auto-updater: "
@@ -35,13 +35,12 @@ if not status then
                 auto_update_complete = parse_auto_update_result(result, headers, status_code)
             end, function() util.toast("Error downloading auto-updater lib. Update failed to download.", TOAST_ALL) end)
     async_http.dispatch() local i = 1 while (auto_update_complete == nil and i < 10) do util.yield(250) i = i + 1 end
-    local status, lib = pcall(require, "auto-updater")
-    if not status then error("Could not load auto-updater lib") end
+    auto_updater = require("auto-updater")
 end
 
 local function auto_update_branch(selected_branch)
     local branch_source_url = auto_update_source_url:gsub("/main/", "/"..selected_branch.."/")
-    run_auto_update({source_url=branch_source_url, script_relpath=SCRIPT_RELPATH, verify_file_begins_with="--"})
+    auto_updater.run_auto_update({source_url=branch_source_url, script_relpath=SCRIPT_RELPATH, verify_file_begins_with="--"})
 end
 auto_update_branch(AUTO_UPDATE_BRANCHES[SELECTED_BRANCH_INDEX][1])
 
