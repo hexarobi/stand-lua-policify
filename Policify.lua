@@ -1506,7 +1506,6 @@ local function serialize_attachment(attachment)
     end
     serialized_attachment.vehicle_attributes = serialize_vehicle_attributes(attachment)
     for _, child_attachment in pairs(attachment.children) do
-        util.toast("Serializing "..attachment.name.." child #".._.." "..child_attachment.name.." ("..#child_attachment.children.." children)", TOAST_ALL)
         table.insert(serialized_attachment.children, serialize_attachment(child_attachment))
     end
     --util.toast(inspect(serialized_attachment), TOAST_ALL)
@@ -1516,7 +1515,6 @@ end
 local rebuild_saved_vehicles_menu_function
 
 local function save_vehicle(policified_vehicle)
-    util.toast("Saving vehicle with "..#policified_vehicle.children.." children", TOAST_ALL)
     local filepath = VEHICLE_STORE_DIR .. policified_vehicle.name .. ".policify.json"
     local file = io.open(filepath, "wb")
     if not file then error("Cannot write to file '" .. filepath .. "'", TOAST_ALL) end
