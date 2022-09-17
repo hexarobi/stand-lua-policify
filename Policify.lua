@@ -4,17 +4,16 @@
 -- Save and share your policified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0"
+local SCRIPT_VERSION = "3.1b1"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
 }
-local SELECTED_BRANCH_INDEX = 1
+local SELECTED_BRANCH_INDEX = 2
 
 ---
 --- Auto-Updater
 ---
-
 
 local auto_update_source_url = "https://raw.githubusercontent.com/hexarobi/stand-lua-policify/main/Policify.lua"
 
@@ -1222,9 +1221,9 @@ local function attach_attachment_with_children(new_attachment, child_counter)
             attach_attachment_with_children(child_attachment, child_counter)
         end
     end
-    if new_attachment.parent == new_attachment.root then
-        table.insert(new_attachment.root.children, new_attachment)
-    end
+    --if new_attachment.parent == new_attachment.root then
+    --    table.insert(new_attachment.root.children, new_attachment)
+    --end
     return attachment
 end
 
@@ -1246,7 +1245,7 @@ end
 
 local function attach_invis_siren(policified_vehicle)
     if not policified_vehicle.options.attach_invis_police_siren then return end
-    attach_attachment_with_children({
+    local attachment = attach_attachment_with_children({
         root = policified_vehicle,
         parent = policified_vehicle,
         name = policified_vehicle.options.siren_attachment.name .. " (Siren)",
@@ -1255,6 +1254,7 @@ local function attach_invis_siren(policified_vehicle)
         is_visible = false,
         is_siren = true,
     })
+    table.insert(policified_vehicle.children, attachment)
 end
 
 local function detach_invis_sirens(policified_vehicle)
@@ -1506,6 +1506,7 @@ local function serialize_attachment(attachment)
     end
     serialized_attachment.vehicle_attributes = serialize_vehicle_attributes(attachment)
     for _, child_attachment in pairs(attachment.children) do
+        util.toast("Serializing "..attachment.name.." child #".._.." "..child_attachment.name.." ("..#child_attachment.children.." children)", TOAST_ALL)
         table.insert(serialized_attachment.children, serialize_attachment(child_attachment))
     end
     --util.toast(inspect(serialized_attachment), TOAST_ALL)
@@ -1515,6 +1516,7 @@ end
 local rebuild_saved_vehicles_menu_function
 
 local function save_vehicle(policified_vehicle)
+    util.toast("Saving vehicle with "..#policified_vehicle.children.." children", TOAST_ALL)
     local filepath = VEHICLE_STORE_DIR .. policified_vehicle.name .. ".policify.json"
     local file = io.open(filepath, "wb")
     if not file then error("Cannot write to file '" .. filepath .. "'", TOAST_ALL) end
