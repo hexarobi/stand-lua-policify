@@ -4,7 +4,7 @@
 -- Save and share your policified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0.1"
+local SCRIPT_VERSION = "3.1"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -18,28 +18,31 @@ local SELECTED_BRANCH_INDEX = 1
 local auto_update_source_url = "https://raw.githubusercontent.com/hexarobi/stand-lua-policify/main/Policify.lua"
 
 -- Auto Updater from https://github.com/hexarobi/stand-lua-auto-updater
-local status, lib = pcall(require, "auto-updater")
+local status, auto_updater = pcall(require, "auto-updater")
 if not status then
-    auto_update_complete = nil util.toast("Installing auto-updater...", TOAST_ALL)
+    local auto_update_complete = nil util.toast("Installing auto-updater...", TOAST_ALL)
     async_http.init("raw.githubusercontent.com", "/hexarobi/stand-lua-auto-updater/main/auto-updater.lua",
             function(result, headers, status_code)
                 local function parse_auto_update_result(result, headers, status_code)
                     local error_prefix = "Error downloading auto-updater: "
                     if status_code ~= 200 then util.toast(error_prefix..status_code, TOAST_ALL) return false end
                     if not result or result == "" then util.toast(error_prefix.."Found empty file.", TOAST_ALL) return false end
+                    filesystem.mkdir(filesystem.scripts_dir() .. "lib")
                     local file = io.open(filesystem.scripts_dir() .. "lib\\auto-updater.lua", "wb")
                     if file == nil then util.toast(error_prefix.."Could not open file for writing.", TOAST_ALL) return false end
                     file:write(result) file:close() util.toast("Successfully installed auto-updater lib", TOAST_ALL) return true
                 end
                 auto_update_complete = parse_auto_update_result(result, headers, status_code)
             end, function() util.toast("Error downloading auto-updater lib. Update failed to download.", TOAST_ALL) end)
-    async_http.dispatch() local i = 1 while (auto_update_complete == nil and i < 10) do util.yield(250) i = i + 1 end
-    require("auto-updater")
+    async_http.dispatch() local i = 1 while (auto_update_complete == nil and i < 20) do util.yield(250) i = i + 1 end
+    if auto_update_complete == nil then error("Error downloading auto-updater lib. HTTP Request timeout") end
+    auto_updater = require("auto-updater")
 end
+if auto_updater == true then error("Invalid auto-updater lib. Please delete your Stand/Lua Scripts/lib/auto-updater.lua and try again") end
 
 local function auto_update_branch(selected_branch)
     local branch_source_url = auto_update_source_url:gsub("/main/", "/"..selected_branch.."/")
-    run_auto_update({source_url=branch_source_url, script_relpath=SCRIPT_RELPATH, verify_file_begins_with="--"})
+    auto_updater.run_auto_update({source_url=branch_source_url, script_relpath=SCRIPT_RELPATH, verify_file_begins_with="--"})
 end
 auto_update_branch(AUTO_UPDATE_BRANCHES[SELECTED_BRANCH_INDEX][1])
 
@@ -61,6 +64,8 @@ local config = {
     override_light_multiplier = 1,
     attach_invis_police_siren = true,
     plate_text = "FIB",
+    horn_cycles_siren = true,
+    siren_status = 1,
     siren_attachment = {
         name = "Police Cruiser",
         model = "police",
@@ -71,16 +76,7 @@ local config = {
 }
 
 local VEHICLE_STORE_DIR = filesystem.store_dir() .. 'Policify\\vehicles\\'
-
-local function ensure_directory_exists(path)
-    path = path:gsub("\\", "/")
-    local dirpath = ""
-    for dirname in path:gmatch("[^/]+") do
-        dirpath = dirpath .. dirname .. "/"
-        if not filesystem.exists(dirpath) then filesystem.mkdir(dirpath) end
-    end
-end
-ensure_directory_exists(VEHICLE_STORE_DIR)
+filesystem.mkdirs(VEHICLE_STORE_DIR)
 
 local policified_vehicles = {}
 local last_policified_vehicle
@@ -534,8 +530,14 @@ local siren_types = {
 ---
 
 util.require_natives(1660775568)
-local json = require("json")
---local inspect = require("inspect")
+local status, natives = pcall(require, "natives-1660775568")
+if not status then error("Could not natives lib. Make sure it is selected under Stand > Lua Scripts > Repository > natives-1660775568") end
+
+local status, json = pcall(require, "json")
+if not status then error("Could not load json lib. Make sure it is selected under Stand > Lua Scripts > Repository > json") end
+
+--local status, json = pcall(require, "inspect")
+--if not status then error("Could not inspect lib") end
 
 function table.table_copy(obj)
     if type(obj) ~= 'table' then
@@ -1373,12 +1375,10 @@ end
 local function add_overrides_to_vehicle(policified_vehicle)
     if policified_vehicle.options.override_headlights then
         save_headlights(policified_vehicle)
-        set_headlights(policified_vehicle)
     end
 
     if policified_vehicle.options.override_neon then
         save_neon(policified_vehicle)
-        set_neon(policified_vehicle)
     end
 
     if policified_vehicle.options.override_horn then
@@ -1897,7 +1897,7 @@ menu.action(menu.my_root(), "Policify Vehicle", { "policify" }, "Enable Policify
     end
 end)
 
-menu.list_select(menu.my_root(), "All Sirens", {}, "Set siren status for ALL currently policified vehicles", { "Off", "Lights Only", "Sirens and Lights" }, 1, function(siren_status)
+menu.list_select(menu.my_root(), "All Sirens", {}, "Set siren status for ALL currently policified vehicles. Honk horn to cycle through options.", { "Off", "Lights Only", "Sirens and Lights" }, 1, function(siren_status)
     config.siren_status = siren_status
     for _, policified_vehicle in pairs(policified_vehicles) do
         local previous_siren_status = policified_vehicle.options.siren_status
@@ -1905,6 +1905,17 @@ menu.list_select(menu.my_root(), "All Sirens", {}, "Set siren status for ALL cur
         update_siren_status(policified_vehicle, previous_siren_status)
     end
 end)
+
+local function cycle_sirens()
+    config.siren_status = config.siren_status - 1
+    if config.siren_status > 3 then config.siren_status = 1 end
+    if config.siren_status < 1 then config.siren_status = 3 end
+    for _, policified_vehicle in pairs(policified_vehicles) do
+        local previous_siren_status = policified_vehicle.options.siren_status
+        policified_vehicle.options.siren_status = config.siren_status
+        update_siren_status(policified_vehicle, previous_siren_status)
+    end
+end
 
 menu.action(menu.my_root(), "Siren Warning Blip", { "blip" }, "A quick siren blip to gain attention (local only)", function()
     if last_policified_vehicle then
@@ -2109,6 +2120,10 @@ menu.list_select(options_menu, "Invis Siren Type", {}, "Different siren types ha
     }
 end)
 
+menu.toggle(options_menu, "Horn cycles siren", {}, "If enabled, honking policifed vehicle horn will cycle through siren.", function(toggle)
+    config.horn_cycles_siren = toggle
+end, config.horn_cycles_siren)
+
 local script_meta_menu = menu.list(menu.my_root(), "Script Meta")
 
 menu.divider(script_meta_menu, "Policify")
@@ -2124,5 +2139,16 @@ menu.readonly(script_meta_menu, "Jackz for writing Vehicle Builder", "Much of Po
 
 util.create_tick_handler(function()
     policify_tick()
+    if config.horn_cycles_siren and PAD.IS_CONTROL_JUST_PRESSED(0, 86) then
+        for _, policified_vehicle in pairs(policified_vehicles) do
+            if policified_vehicle.handle == entities.get_user_vehicle_as_handle() then
+                policified_vehicle.options.siren_status = policified_vehicle.options.siren_status - 1
+                if policified_vehicle.options.siren_status > 3 then policified_vehicle.options.siren_status = 1 end
+                if policified_vehicle.options.siren_status < 1 then policified_vehicle.options.siren_status = 3 end
+                update_siren_status(policified_vehicle, policified_vehicle.options.siren_status)
+                sound_blip(policified_vehicle)
+            end
+        end
+    end
     return true
 end)
