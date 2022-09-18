@@ -4,7 +4,7 @@
 -- Save and share your policified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0.2b6"
+local SCRIPT_VERSION = "3.0.2b7"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -64,6 +64,7 @@ local config = {
     override_light_multiplier = 1,
     attach_invis_police_siren = true,
     plate_text = "FIB",
+    siren_status = 1,
     siren_attachment = {
         name = "Police Cruiser",
         model = "police",
@@ -74,16 +75,7 @@ local config = {
 }
 
 local VEHICLE_STORE_DIR = filesystem.store_dir() .. 'Policify\\vehicles\\'
-
-local function ensure_directory_exists(path)
-    path = path:gsub("\\", "/")
-    local dirpath = ""
-    for dirname in path:gmatch("[^/]+") do
-        dirpath = dirpath .. dirname .. "/"
-        if not filesystem.exists(dirpath) then filesystem.mkdir(dirpath) end
-    end
-end
-ensure_directory_exists(VEHICLE_STORE_DIR)
+filesystem.mkdirs(VEHICLE_STORE_DIR)
 
 local policified_vehicles = {}
 local last_policified_vehicle
@@ -1904,7 +1896,7 @@ menu.action(menu.my_root(), "Policify Vehicle", { "policify" }, "Enable Policify
     end
 end)
 
-menu.list_select(menu.my_root(), "All Sirens", {}, "Set siren status for ALL currently policified vehicles", { "Off", "Lights Only", "Sirens and Lights" }, 1, function(siren_status)
+menu.list_select(menu.my_root(), "All Sirens", {}, "Set siren status for ALL currently policified vehicles. Honk horn to cycle through options.", { "Off", "Lights Only", "Sirens and Lights" }, 1, function(siren_status)
     config.siren_status = siren_status
     for _, policified_vehicle in pairs(policified_vehicles) do
         local previous_siren_status = policified_vehicle.options.siren_status
@@ -1912,6 +1904,17 @@ menu.list_select(menu.my_root(), "All Sirens", {}, "Set siren status for ALL cur
         update_siren_status(policified_vehicle, previous_siren_status)
     end
 end)
+
+local function cycle_sirens()
+    config.siren_status = config.siren_status - 1
+    if config.siren_status > 3 then config.siren_status = 1 end
+    if config.siren_status < 1 then config.siren_status = 3 end
+    for _, policified_vehicle in pairs(policified_vehicles) do
+        local previous_siren_status = policified_vehicle.options.siren_status
+        policified_vehicle.options.siren_status = config.siren_status
+        update_siren_status(policified_vehicle, previous_siren_status)
+    end
+end
 
 menu.action(menu.my_root(), "Siren Warning Blip", { "blip" }, "A quick siren blip to gain attention (local only)", function()
     if last_policified_vehicle then
@@ -2131,5 +2134,11 @@ menu.readonly(script_meta_menu, "Jackz for writing Vehicle Builder", "Much of Po
 
 util.create_tick_handler(function()
     policify_tick()
+    if last_policified_vehicle then
+        if PAD.IS_CONTROL_JUST_PRESSED(0, 86) then
+            cycle_sirens()
+            sound_blip(last_policified_vehicle)
+        end
+    end
     return true
 end)
