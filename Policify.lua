@@ -4,7 +4,7 @@
 -- Save and share your policified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.0.2b7"
+local SCRIPT_VERSION = "3.0.2b8"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -64,6 +64,7 @@ local config = {
     override_light_multiplier = 1,
     attach_invis_police_siren = true,
     plate_text = "FIB",
+    horn_cycles_siren = true,
     siren_status = 1,
     siren_attachment = {
         name = "Police Cruiser",
@@ -2119,6 +2120,10 @@ menu.list_select(options_menu, "Invis Siren Type", {}, "Different siren types ha
     }
 end)
 
+menu.toggle(options_menu, "Horn cycles siren", {}, "If enabled, honking policifed vehicle horn will cycle through siren.", function(toggle)
+    config.horn_cycles_siren = toggle
+end, config.horn_cycles_siren)
+
 local script_meta_menu = menu.list(menu.my_root(), "Script Meta")
 
 menu.divider(script_meta_menu, "Policify")
@@ -2134,10 +2139,15 @@ menu.readonly(script_meta_menu, "Jackz for writing Vehicle Builder", "Much of Po
 
 util.create_tick_handler(function()
     policify_tick()
-    if last_policified_vehicle then
-        if PAD.IS_CONTROL_JUST_PRESSED(0, 86) then
-            cycle_sirens()
-            sound_blip(last_policified_vehicle)
+    if config.horn_cycles_siren and PAD.IS_CONTROL_JUST_PRESSED(0, 86) then
+        for _, policified_vehicle in pairs(policified_vehicles) do
+            if policified_vehicle.handle == entities.get_user_vehicle_as_handle() then
+                policified_vehicle.options.siren_status = policified_vehicle.options.siren_status - 1
+                if policified_vehicle.options.siren_status > 3 then policified_vehicle.options.siren_status = 1 end
+                if policified_vehicle.options.siren_status < 1 then policified_vehicle.options.siren_status = 3 end
+                update_siren_status(policified_vehicle, policified_vehicle.options.siren_status)
+                sound_blip(policified_vehicle)
+            end
         end
     end
     return true
