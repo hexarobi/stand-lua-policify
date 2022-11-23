@@ -4,18 +4,17 @@
 -- Save and share your policified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.1"
+local SCRIPT_VERSION = "3.2b1"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
 }
-local SELECTED_BRANCH_INDEX = 1
+local SELECTED_BRANCH_INDEX = 2
+local selected_branch = AUTO_UPDATE_BRANCHES[SELECTED_BRANCH_INDEX][1]
 
 ---
---- Auto-Updater
+--- Auto-Updater Lib Install
 ---
-
-local auto_update_source_url = "https://raw.githubusercontent.com/hexarobi/stand-lua-policify/main/Policify.lua"
 
 -- Auto Updater from https://github.com/hexarobi/stand-lua-auto-updater
 local status, auto_updater = pcall(require, "auto-updater")
@@ -34,25 +33,35 @@ if not status then
                 end
                 auto_update_complete = parse_auto_update_result(result, headers, status_code)
             end, function() util.toast("Error downloading auto-updater lib. Update failed to download.", TOAST_ALL) end)
-    async_http.dispatch() local i = 1 while (auto_update_complete == nil and i < 20) do util.yield(250) i = i + 1 end
+    async_http.dispatch() local i = 1 while (auto_update_complete == nil and i < 40) do util.yield(250) i = i + 1 end
     if auto_update_complete == nil then error("Error downloading auto-updater lib. HTTP Request timeout") end
     auto_updater = require("auto-updater")
 end
 if auto_updater == true then error("Invalid auto-updater lib. Please delete your Stand/Lua Scripts/lib/auto-updater.lua and try again") end
 
-local function auto_update_branch(selected_branch)
-    local branch_source_url = auto_update_source_url:gsub("/main/", "/"..selected_branch.."/")
-    auto_updater.run_auto_update({source_url=branch_source_url, script_relpath=SCRIPT_RELPATH, verify_file_begins_with="--"})
-end
-auto_update_branch(AUTO_UPDATE_BRANCHES[SELECTED_BRANCH_INDEX][1])
+local auto_update_config = {
+    source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-policify/main/Policify.lua",
+    script_relpath=SCRIPT_RELPATH,
+    switch_to_branch=selected_branch,
+    verify_file_begins_with="--",
+    check_interval=86400,
+}
+update_success = auto_updater.run_auto_update(auto_update_config)
+
+util.ensure_package_is_installed('lua/natives-1663599433')
+local native_status, natives = pcall(require, "natives-1660775568")
+if not native_status then error("Could not natives lib. Make sure it is selected under Stand > Lua Scripts > Repository > natives-1660775568") end
+
+util.ensure_package_is_installed('lua/json')
+local json_status, json = pcall(require, "json")
+if not json_status then error("Could not load json lib. Make sure it is selected under Stand > Lua Scripts > Repository > json") end
+
+--local status, json = pcall(require, "inspect")
+--if not status then error("Could not inspect lib") end
 
 ---
---- Data
+--- Config
 ---
-
-local SIRENS_OFF = 1
-local SIRENS_LIGHTS_ONLY = 2
-local SIRENS_ALL_ON = 3
 
 local config = {
     flash_delay = 50,
@@ -74,6 +83,14 @@ local config = {
     edit_offset_step = 1,
     edit_rotation_step = 1,
 }
+
+---
+--- Data
+---
+
+local SIRENS_OFF = 1
+local SIRENS_LIGHTS_ONLY = 2
+local SIRENS_ALL_ON = 3
 
 local VEHICLE_STORE_DIR = filesystem.store_dir() .. 'Policify\\vehicles\\'
 filesystem.mkdirs(VEHICLE_STORE_DIR)
@@ -529,16 +546,6 @@ local siren_types = {
 --- Utilities
 ---
 
-util.require_natives(1660775568)
-local status, natives = pcall(require, "natives-1660775568")
-if not status then error("Could not natives lib. Make sure it is selected under Stand > Lua Scripts > Repository > natives-1660775568") end
-
-local status, json = pcall(require, "json")
-if not status then error("Could not load json lib. Make sure it is selected under Stand > Lua Scripts > Repository > json") end
-
---local status, json = pcall(require, "inspect")
---if not status then error("Could not inspect lib") end
-
 function table.table_copy(obj)
     if type(obj) ~= 'table' then
         return obj
@@ -704,21 +711,21 @@ local function deserialize_vehicle_paint(vehicle, serialized_vehicle)
     --VEHICLE.SET_VEHICLE_MOD_KIT(vehicle.handle, 0)
 
     VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(
-        vehicle,
-        serialized_vehicle.paint.vehicle_custom_color.r,
-        serialized_vehicle.paint.vehicle_custom_color.g,
-        serialized_vehicle.paint.vehicle_custom_color.b
+            vehicle,
+            serialized_vehicle.paint.vehicle_custom_color.r,
+            serialized_vehicle.paint.vehicle_custom_color.g,
+            serialized_vehicle.paint.vehicle_custom_color.b
     )
     VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(
-        vehicle,
-        serialized_vehicle.paint.vehicle_custom_color.r,
-        serialized_vehicle.paint.vehicle_custom_color.g,
-        serialized_vehicle.paint.vehicle_custom_color.b
+            vehicle,
+            serialized_vehicle.paint.vehicle_custom_color.r,
+            serialized_vehicle.paint.vehicle_custom_color.g,
+            serialized_vehicle.paint.vehicle_custom_color.b
     )
     VEHICLE.SET_VEHICLE_COLOURS(
-        vehicle,
-        serialized_vehicle.paint.primary.vehicle_standard_color or 0,
-        serialized_vehicle.paint.secondary.vehicle_standard_color or 0
+            vehicle,
+            serialized_vehicle.paint.primary.vehicle_standard_color or 0,
+            serialized_vehicle.paint.secondary.vehicle_standard_color or 0
     )
 
     if serialized_vehicle.paint.extra_colors then
@@ -901,8 +908,8 @@ end
 local function save_headlights(policified_vehicle)
     if policified_vehicle.original_vehicle == nil then policified_vehicle.original_vehicle = {} end
     serialize_vehicle_headlights(
-        policified_vehicle,
-        policified_vehicle.original_vehicle
+            policified_vehicle,
+            policified_vehicle.original_vehicle
     )
 end
 
@@ -915,8 +922,8 @@ end
 
 local function restore_headlights(policified_vehicle)
     deserialize_vehicle_headlights(
-        policified_vehicle,
-        policified_vehicle.original_vehicle
+            policified_vehicle,
+            policified_vehicle.original_vehicle
     )
     VEHICLE.SET_VEHICLE_LIGHTS(policified_vehicle.handle, 0)
 end
@@ -924,8 +931,8 @@ end
 local function save_neon(policified_vehicle)
     if policified_vehicle.original_vehicle == nil then policified_vehicle.original_vehicle = {} end
     serialize_vehicle_neon(
-        policified_vehicle,
-        policified_vehicle.original_vehicle
+            policified_vehicle,
+            policified_vehicle.original_vehicle
     )
 end
 
@@ -938,16 +945,16 @@ end
 
 local function restore_neon(policified_vehicle)
     deserialize_vehicle_neon(
-        policified_vehicle,
-        policified_vehicle.original_vehicle
+            policified_vehicle,
+            policified_vehicle.original_vehicle
     )
 end
 
 local function save_paint(policified_vehicle)
     if policified_vehicle.original_vehicle == nil then policified_vehicle.original_vehicle = {} end
     serialize_vehicle_paint(
-        policified_vehicle,
-        policified_vehicle.original_vehicle
+            policified_vehicle,
+            policified_vehicle.original_vehicle
     )
 end
 
@@ -964,8 +971,8 @@ end
 
 local function restore_paint(policified_vehicle)
     deserialize_vehicle_paint(
-        policified_vehicle,
-        policified_vehicle.original_vehicle
+            policified_vehicle,
+            policified_vehicle.original_vehicle
     )
 end
 
