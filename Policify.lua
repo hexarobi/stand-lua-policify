@@ -4,7 +4,7 @@
 -- Save and share your policified vehicles.
 -- https://github.com/hexarobi/stand-lua-policify
 
-local SCRIPT_VERSION = "3.2"
+local SCRIPT_VERSION = "3.3"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -703,7 +703,7 @@ local function serialize_vehicle_paint(vehicle, serialized_vehicle)
     -- Livery is also part of mods, but capture it here as well for when just saving paint
     serialized_vehicle.paint.livery = VEHICLE.GET_VEHICLE_MOD(vehicle.handle, 48)
 
-    memory.free(color.r) memory.free(color.g) memory.free(color.b)
+    --memory.free(color.r) memory.free(color.g) memory.free(color.b)
 end
 
 local function deserialize_vehicle_paint(vehicle, serialized_vehicle)
@@ -791,7 +791,7 @@ local function serialize_vehicle_neon(vehicle, serialized_vehicle)
         VEHICLE._GET_VEHICLE_NEON_LIGHTS_COLOUR(vehicle.handle, color.r, color.g, color.b)
         serialized_vehicle.neon.color = { r = memory.read_int(color.r), g = memory.read_int(color.g), b = memory.read_int(color.b) }
     end
-    memory.free(color.r) memory.free(color.g) memory.free(color.b)
+    --memory.free(color.r) memory.free(color.g) memory.free(color.b)
 end
 
 local function deserialize_vehicle_neon(vehicle, serialized_vehicle)
@@ -815,7 +815,7 @@ local function serialize_vehicle_wheels(vehicle, serialized_vehicle)
     local color = { r = memory.alloc(4), g = memory.alloc(4), b = memory.alloc(4) }
     VEHICLE.GET_VEHICLE_TYRE_SMOKE_COLOR(vehicle.handle, color.r, color.g, color.b)
     serialized_vehicle.wheels.tire_smoke_color = { r = memory.read_int(color.r), g = memory.read_int(color.g), b = memory.read_int(color.b) }
-    memory.free(color.r) memory.free(color.g) memory.free(color.b)
+    --memory.free(color.r) memory.free(color.g) memory.free(color.b)
 end
 
 local function deserialize_vehicle_wheels(vehicle, serialized_vehicle)
@@ -2016,7 +2016,9 @@ policified_vehicles_menu = menu.list(menu.my_root(), "Policified Vehicles")
 local saved_vehicles_menu = menu.list(menu.my_root(), "Saved Vehicles")
 local saved_vehicles_menu_items = {}
 
-menu.hyperlink(saved_vehicles_menu, "Open Saved Vehicles Folder", "file:///"..filesystem.store_dir() .. 'Policify\\vehicles\\', "Open Saved Vehicles folder")
+menu.action(saved_vehicles_menu, "Open Saved Vehicles Folder", {}, "Open Saved Vehicles folder", function()
+    util.open_folder(filesystem.store_dir() .. 'Policify\\vehicles\\')
+end)
 
 local function load_vehicle_from_file(filepath)
     local file = io.open(filepath, "r")
